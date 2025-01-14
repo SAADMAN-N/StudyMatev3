@@ -8,6 +8,7 @@ export class SignalingService {
   private webrtcManager: WebRTCManager;
   private onPeerConnectedCallback?: () => void;
   private onPeerDisconnectedCallback?: () => void;
+  private joinTimeoutId?: NodeJS.Timeout;
 
   constructor(webrtcManager: WebRTCManager) {
     this.webrtcManager = webrtcManager;
@@ -126,31 +127,45 @@ export class SignalingService {
     });
   }
 
-  public findMatch(tags: string[], roomId: string) {
-    console.log('Looking for a match with tags:', tags, 'roomId:', roomId);
+  public findMatch(tags: string[]) {
+    console.log('Looking for a match with tags:', tags);
     console.log('Current socket ID:', this.socket.id);
     console.log('Socket connection status:', this.socket.connected);
-    this.socket.emit('find-match', { tags, roomId });
+    this.socket.emit('find-match', { tags });
   }
 
   public joinRoom(roomId: string) {
     console.log('Joining room:', roomId);
     console.log('Current socket ID:', this.socket.id);
     console.log('Socket connection status:', this.socket.connected);
+    
+    // Clear any existing timeouts
+    if (this.joinTimeoutId) {
+      clearTimeout(this.joinTimeoutId);
+    }
+    
+    // Reset connection state
+    const existingConnection = this.webrtcManager.getConnection(roomId);
+    if (existingConnection) {
+      this.webrtcManager.closeConnection(roomId);
+    }
+    
     this.socket.emit('join-room', { roomId });
     
     // Add error handler for room joining
-    this.socket.once('error', (error) => {
+    const errorHandler = (error: any) => {
       console.error('Failed to join room:', error);
       toast({
         title: "Connection Error",
-        description: error.message,
+        description: error.message || "Failed to join room",
         variant: "destructive",
       });
-    });
-
+    };
+    
+    this.socket.once('error', errorHandler);
+    
     // Add timeout to detect if connection is taking too long
-    setTimeout(() => {
+    this.joinTimeoutId = setTimeout(() => {
       const connection = this.webrtcManager.getConnection(roomId);
       if (!connection) {
         console.error('Connection timeout - no peer connection established');
@@ -159,8 +174,12 @@ export class SignalingService {
           description: "Failed to establish connection. Please try again.",
           variant: "destructive",
         });
+        // Clean up the error handler
+        this.socket.off('error', errorHandler);
+        // Close any partial connections
+        this.webrtcManager.closeConnection(roomId);
       }
-    }, 10000); // 10 second timeout
+    }, 15000); // 15 second timeout
   }
 
   public skipPeer(tags: string[]) {
@@ -170,6 +189,9 @@ export class SignalingService {
 
   public disconnect() {
     console.log('Disconnecting from signaling server...');
+    if (this.joinTimeoutId) {
+      clearTimeout(this.joinTimeoutId);
+    }
     this.socket.disconnect();
   }
 

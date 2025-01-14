@@ -26,11 +26,9 @@ const activeConnections = new Map();
 const rooms = new Map(); // roomId -> { creator: string, joined: string }
 
 // Handle random matching
-function findMatch(socket, userTags) {
-  userTags = userTags || [];
+function findMatch(socket, userTags = []) {
   console.log('Finding match for user:', socket.id, 'with tags:', userTags);
   console.log('Current waiting users:', Array.from(waitingUsers.entries()));
-  console.log('Current active connections:', Array.from(activeConnections.entries()));
   
   // Remove user from waiting pool if they were there
   waitingUsers.delete(socket.id);
@@ -38,25 +36,36 @@ function findMatch(socket, userTags) {
   // Convert waiting users to array for filtering
   const waitingArray = Array.from(waitingUsers.entries());
   
-  // Find users with matching tags
-  const matchingUsers = waitingArray.filter(([userId, userData]) => {
-    // If no tags provided, match with anyone
-    if (!userTags.length || !userData.tags?.length) return true;
-    const commonTags = userData.tags.filter(tag => userTags.includes(tag));
-    return commonTags.length > 0;
-  });
+  let matchedUserId = null;
+  
+  // First try to find users with matching tags
+  if (userTags.length > 0) {
+    const matchingUsers = waitingArray.filter(([userId, userData]) => {
+      const userDataTags = userData.tags || [];
+      const commonTags = userDataTags.filter(tag => userTags.includes(tag));
+      return commonTags.length > 0;
+    });
 
-  if (matchingUsers.length === 0) {
-    // If no matching users are waiting, add this user to waiting pool
+    if (matchingUsers.length > 0) {
+      // Get random user from matching users
+      const randomIndex = Math.floor(Math.random() * matchingUsers.length);
+      [matchedUserId] = matchingUsers[randomIndex];
+    }
+  }
+  
+  // If no tag matches found, try to match with any waiting user
+  if (!matchedUserId && waitingArray.length > 0) {
+    const randomIndex = Math.floor(Math.random() * waitingArray.length);
+    [matchedUserId] = waitingArray[randomIndex];
+  }
+
+  if (!matchedUserId) {
+    // If no matches available, add user to waiting pool
     waitingUsers.set(socket.id, { tags: userTags });
     console.log('No matches available, added to waiting pool:', socket.id);
     return null;
   }
 
-  // Get random user from matching users
-  const randomIndex = Math.floor(Math.random() * matchingUsers.length);
-  const [matchedUserId] = matchingUsers[randomIndex];
-  
   // Remove matched user from waiting pool
   waitingUsers.delete(matchedUserId);
   
@@ -72,44 +81,39 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   console.log('Current connections:', io.engine.clientsCount);
 
-  socket.on('find-match', ({ tags, roomId }) => {
-    console.log('User looking for match:', socket.id, 'with tags:', tags, 'roomId:', roomId);
-    
-    if (roomId) {
-      // Create a new room
-      rooms.set(roomId, { creator: socket.id });
-      waitingUsers.set(socket.id, { tags, roomId });
-      console.log('Created new room:', roomId, 'creator:', socket.id);
-      
-      // Log all current rooms
-      console.log('Current rooms:', Array.from(rooms.entries()).map(([id, room]) => ({
-        id,
-        creator: room.creator,
-        joined: room.joined
-      })));
-    } else {
-      const match = findMatch(socket, tags);
-      if (match) {
-        // Notify both users of the match
-        socket.emit('matched', match);
-        io.to(match).emit('matched', socket.id);
-      }
+  socket.on('find-match', ({ tags }) => {
+    console.log('User looking for match:', socket.id, 'with tags:', tags);
+    const match = findMatch(socket, tags);
+    if (match) {
+      // Notify both users of the match
+      socket.emit('matched', match);
+      io.to(match).emit('matched', socket.id);
     }
   });
 
   socket.on('join-room', ({ roomId }) => {
     console.log('User joining room:', socket.id, 'roomId:', roomId);
+    console.log('Available rooms:', Array.from(rooms.entries()));
     const room = rooms.get(roomId);
     
     if (!room) {
       console.log('Room not found:', roomId);
-      socket.emit('error', { message: 'Room not found' });
+      console.log('Current rooms:', Array.from(rooms.entries()).map(([id, room]) => ({
+        id,
+        creator: room.creator,
+        joined: room.joined
+      })));
+      socket.emit('error', { message: 'Room not found or has expired. Please create a new room.' });
       return;
     }
     
     if (room.joined) {
       console.log('Room already full:', roomId);
-      socket.emit('error', { message: 'Room already full' });
+      console.log('Room details:', {
+        creator: room.creator,
+        joined: room.joined
+      });
+      socket.emit('error', { message: 'This room is already full. Please create a new room or try a different room ID.' });
       return;
     }
 

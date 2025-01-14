@@ -175,26 +175,14 @@ const VideoPanel = ({
 
   const handleFindMatch = () => {
     setIsSearching(true);
-    if (!selectedTags.length) {
-      toast({
-        title: "Selection Required",
-        description: "Please select at least one interest before finding a partner.",
-        variant: "destructive",
-      });
-      setIsSearching(false);
-      return;
-    }
-
-    // Generate a unique room ID for sharing
-    const newRoomId = crypto.randomUUID();
-    setRoomId(newRoomId);
-    signalingService.current?.findMatch(selectedTags, newRoomId);
+    signalingService.current?.findMatch(selectedTags);
     
-    // Show room ID created notification
     toast({
-      title: "Room Created",
-      description: "Share the Room ID with your study partner to connect",
-      duration: 5000,
+      title: "Finding Partner",
+      description: selectedTags.length > 0 
+        ? "Looking for someone with similar interests..." 
+        : "Looking for any available study partner...",
+      duration: 3000,
     });
   };
 
@@ -263,7 +251,7 @@ const VideoPanel = ({
           {/* Remote video (main view) */}
           <div className="w-full h-full flex items-center justify-center">
             {isConnected ? (
-              <>
+              <div className="relative w-full h-full">
                 <video
                   ref={remoteVideoRef}
                   className="w-full h-full object-cover"
@@ -279,10 +267,12 @@ const VideoPanel = ({
                     });
                   }}
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <p className="text-white">Connecting video stream...</p>
-                </div>
-              </>
+                {!remoteVideoRef.current?.srcObject && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <p className="text-white">Connecting video stream...</p>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="text-center">
                 <UserCircle2 className="h-24 w-24 text-slate-600 mx-auto mb-4" />
@@ -327,66 +317,14 @@ const VideoPanel = ({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 mt-4">
                   <Button
                     onClick={handleFindMatch}
-                    disabled={isSearching || selectedTags.length === 0}
-                    className="mb-2"
+                    disabled={isSearching}
+                    className="w-full"
                   >
-                    {isSearching ? 'Searching...' : 'Find Study Partner'}
+                    {isSearching ? 'Searching...' : selectedTags.length > 0 ? 'Find Study Partner' : 'Find Random Partner'}
                   </Button>
-
-                  <div className="flex flex-col space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={roomId || ''}
-                        readOnly
-                        placeholder="Room ID will appear here"
-                        className="px-3 py-2 bg-slate-700 rounded text-sm w-full"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (roomId) {
-                            navigator.clipboard.writeText(roomId);
-                            toast({
-                              title: "Room ID Copied!",
-                              description: "Share this ID with your study partner",
-                              duration: 3000,
-                            });
-                          }
-                        }}
-                        disabled={!roomId}
-                      >
-                        Copy ID
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        placeholder="Enter Room ID to join"
-                        className="px-3 py-2 bg-slate-700 rounded text-sm w-full"
-                        onChange={(e) => setRoomId(e.target.value)}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (roomId) {
-                            signalingService.current?.joinRoom(roomId);
-                            toast({
-                              title: "Joining Room",
-                              description: "Connecting to your study partner...",
-                            });
-                          }
-                        }}
-                        disabled={!roomId}
-                      >
-                        Join
-                      </Button>
-                    </div>
-                  </div>
 
                   {selectedTags.length === 0 && (
                     <p className="text-sm text-slate-400">Select at least one interest to find a study partner</p>

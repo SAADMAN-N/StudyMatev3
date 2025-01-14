@@ -6,6 +6,10 @@
 - Deploy server directory as a Node.js service
 - Set PORT environment variable to 3001
 - Enable CORS for frontend domain
+- Automatic Deployment:
+  - Webhook URL available at: /deploy/srv-[id]?key=[key]
+  - Can be added to GitHub repository webhooks
+  - Triggers new deployment when code is pushed
 
 ### Frontend (Vercel)
 - Environment Variables:
@@ -13,6 +17,11 @@
   - Must use HTTPS URL in production
   - Must include full URL with protocol (https://)
   - Local development can use http://localhost:3001
+  - After deploying signaling server:
+    1. Add VITE_SIGNALING_SERVER env var in Vercel
+    2. Enable for all environments (Production, Preview, Development)
+    3. Redeploy after adding the environment variable
+    4. Never use localhost in production environment variables
 - Build Command: npm run build
 - Output Directory: dist
 - Node.js Version: >=18.0.0
@@ -100,7 +109,38 @@ For collaborative editing features:
 - Real-time updates for collaboration
 
 ## Video Chat Implementation
-- When testing WebRTC connections:
+- Room Sharing Options:
+  - Random matching with tags
+  - Direct room joining via ID
+  - URL sharing with room parameter
+  - Manual room ID copy/paste  - When testing WebRTC connections:
+    - Check browser console for connection logs
+    - Ensure both peers have camera/microphone permissions
+    - Verify STUN/TURN servers are reachable
+    - Both peers must be on HTTPS or localhost
+    - Check NAT traversal by testing on different networks
+    - When handling WebRTC streams:
+      - Both peers must handle signal events in both directions
+      - Remote stream must be played explicitly with .play()
+      - Stream callbacks must be set before peer connection is established
+      - Remote video element needs:
+        - autoPlay and playsInline attributes
+        - muted={false} to hear remote audio
+        - Small delay when setting srcObject to ensure ref is mounted
+      - When testing on different browsers:
+        - Safari should initiate the connection
+        - Both peers must handle signal events in both directions
+        - Remote stream must be played explicitly with .play()
+        - Handle autoplay restrictions:
+          - Call play() after setting srcObject
+          - Catch play() promise rejection
+          - Provide fallback play button for browsers blocking autoplay
+          - Check track states when receiving stream
+    - Check browser console for connection logs
+    - Ensure both peers have camera/microphone permissions
+    - Verify STUN/TURN servers are reachable
+    - Both peers must be on HTTPS or localhost
+    - Check NAT traversal by testing on different networks
   - Check browser console for connection logs
   - Ensure both peers have camera/microphone permissions
   - Verify STUN/TURN servers are reachable
@@ -112,6 +152,17 @@ For collaborative editing features:
     - Need to polyfill global with globalThis in vite.config.ts
     - Create SimplePeer instance directly without using call
     - Use type assertion for proper TypeScript support
+    - Required Node.js polyfills:
+      - stream-browserify
+      - events
+      - inherits
+      - readable-stream
+      - util (must be aliased as 'util' not 'util/')
+      - process (must be aliased as 'process/browser')
+    - In vite.config.ts:
+      - Set define.global = 'globalThis'
+      - Set define['process.env'] = process.env
+      - Add all polyfills to resolve.alias
     - Required Node.js polyfills:
       - stream-browserify
       - events

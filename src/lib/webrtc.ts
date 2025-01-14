@@ -30,9 +30,21 @@ export class WebRTCManager {
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
+          facingMode: 'user'
         },
         audio: true
+      });
+      
+      // Log stream information
+      console.log('Local stream obtained:', {
+        id: this.localStream.id,
+        tracks: this.localStream.getTracks().map(track => ({
+          kind: track.kind,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState
+        }))
       });
       
       return this.localStream;
@@ -77,19 +89,25 @@ export class WebRTCManager {
           muted: t.muted,
           readyState: t.readyState
         })));
-        console.log('Stream tracks:', remoteStream.getTracks().map(t => ({
-          kind: t.kind,
-          enabled: t.enabled,
-          muted: t.muted,
-          readyState: t.readyState
-        })));
         
-        if (this.onStreamCallback) {
-          console.log('Calling stream callback with remote stream');
-          this.onStreamCallback(remoteStream);
-        } else {
-          console.warn('No stream callback registered');
-        }
+        const attemptCallback = (retries = 3) => {
+          if (this.onStreamCallback) {
+            console.log('Calling stream callback with remote stream');
+            try {
+              this.onStreamCallback(remoteStream);
+            } catch (error) {
+              console.error('Error in stream callback:', error);
+              if (retries > 0) {
+                console.log(`Retrying callback in 1s, ${retries} attempts remaining`);
+                setTimeout(() => attemptCallback(retries - 1), 1000);
+              }
+            }
+          } else {
+            console.warn('No stream callback registered');
+          }
+        };
+        
+        attemptCallback();
       });
 
       peer.on('error', (err) => {

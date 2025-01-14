@@ -41,7 +41,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'process.env': {},
+    'process.env': process.env,
     'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.VITE_OPENAI_API_KEY)
   },
   server: {
