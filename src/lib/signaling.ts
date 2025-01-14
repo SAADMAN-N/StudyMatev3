@@ -1,24 +1,25 @@
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import { WebRTCManager } from './webrtc';
 import { toast } from '@/components/ui/use-toast';
 
 export class SignalingService {
   private socket: Socket;
   private webrtcManager: WebRTCManager;
+  private onPeerConnectedCallback?: () => void;
   private onPeerDisconnectedCallback?: () => void;
 
   constructor(webrtcManager: WebRTCManager) {
     this.webrtcManager = webrtcManager;
+    
+    // In production, force HTTPS
     const SIGNALING_SERVER = import.meta.env.VITE_SIGNALING_SERVER || 
       (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-render-url.onrender.com');
     
     console.log('Connecting to signaling server:', SIGNALING_SERVER);
     console.log('Environment:', import.meta.env.MODE);
     console.log('VITE_SIGNALING_SERVER:', import.meta.env.VITE_SIGNALING_SERVER);
-  private onPeerConnectedCallback?: () => void;
-    // In production, force HTTPS
-    const SIGNALING_SERVER = import.meta.env.VITE_SIGNALING_SERVER || 
-      (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-render-url.onrender.com');
+
     this.socket = io(SIGNALING_SERVER, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
@@ -122,10 +123,6 @@ export class SignalingService {
         description: "Connection to signaling server restored",
         variant: "default",
       });
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from signaling server');
     });
   }
 
