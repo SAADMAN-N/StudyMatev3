@@ -26,7 +26,8 @@ const activeConnections = new Map();
 const rooms = new Map(); // roomId -> { creator: string, joined: string }
 
 // Handle random matching
-function findMatch(socket, userTags = []) {
+function findMatch(socket, userTags) {
+  userTags = userTags || [];
   console.log('Finding match for user:', socket.id, 'with tags:', userTags);
   
   // Remove user from waiting pool if they were there
@@ -134,12 +135,12 @@ io.on('connection', (socket) => {
     const oldPeer = activeConnections.get(socket.id);
     if (oldPeer) {
       io.to(oldPeer).emit('peer-left', socket.id);
+      activeConnections.delete(socket.id);
+      activeConnections.delete(oldPeer);
     }
 
     // Find new match
     const match = findMatch(socket, tags);
-      activeConnections.delete(socket.id);
-      activeConnections.delete(oldPeer);
     // Get user's tags from waiting pool or use empty array
     const userTags = waitingUsers.get(socket.id)?.tags || [];
     const match = findMatch(socket, userTags);
