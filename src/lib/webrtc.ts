@@ -60,6 +60,10 @@ export class WebRTCManager {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
             { urls: 'stun:global.stun.twilio.com:3478' }
           ]
         }
@@ -90,10 +94,20 @@ export class WebRTCManager {
 
       peer.on('error', (err) => {
         console.error('Peer connection error:', err);
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack
+        });
       });
 
       peer.on('connect', () => {
         console.log('Peer connection established with stream:', stream.id);
+        console.log('Stream tracks:', stream.getTracks().map(t => ({
+          kind: t.kind,
+          enabled: t.enabled,
+          muted: t.muted,
+          readyState: t.readyState
+        })));
         console.log('Stream tracks:', stream.getTracks().map(t => ({
           kind: t.kind,
           enabled: t.enabled,

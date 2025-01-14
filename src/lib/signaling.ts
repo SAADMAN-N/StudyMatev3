@@ -23,14 +23,36 @@ export class SignalingService {
   private setupSocketListeners() {
     this.socket.on('connect', () => {
       console.log('Connected to signaling server with ID:', this.socket.id);
+      toast({
+        title: "Connected",
+        description: "Successfully connected to signaling server",
+        variant: "default",
+      });
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('Failed to connect to signaling server:', error);
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to signaling server. Please check your internet connection.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('Disconnected from signaling server');
+      toast({
+        title: "Disconnected",
+        description: "Lost connection to signaling server",
+        variant: "destructive",
+        duration: 5000,
+      });
     });
 
     this.socket.on('matched', async (peerId: string) => {
       console.log('Matched with peer:', peerId);
+      console.log('Local socket ID:', this.socket.id);
       try {
         // Initialize peer with correct initiator flag
         const peer = await this.webrtcManager.initializePeer(peerId, true);
@@ -86,6 +108,15 @@ export class SignalingService {
       this.onPeerDisconnectedCallback?.();
     });
 
+    this.socket.on('reconnect', (attemptNumber: number) => {
+      console.log('Reconnected to signaling server after', attemptNumber, 'attempts');
+      toast({
+        title: "Reconnected",
+        description: "Connection to signaling server restored",
+        variant: "default",
+      });
+    });
+
     this.socket.on('disconnect', () => {
       console.log('Disconnected from signaling server');
     });
@@ -93,6 +124,8 @@ export class SignalingService {
 
   public findMatch(tags: string[], roomId: string) {
     console.log('Looking for a match with tags:', tags, 'roomId:', roomId);
+    console.log('Current socket ID:', this.socket.id);
+    console.log('Socket connection status:', this.socket.connected);
     this.socket.emit('find-match', { tags, roomId });
   }
 
