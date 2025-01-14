@@ -124,9 +124,9 @@ export class SignalingService {
     }, 10000); // 10 second timeout
   }
 
-  public skipPeer() {
-    console.log('Skipping current peer...');
-    this.socket.emit('skip');
+  public skipPeer(tags: string[]) {
+    console.log('Skipping current peer with tags:', tags);
+    this.socket.emit('skip', { tags });
   }
 
   public disconnect() {

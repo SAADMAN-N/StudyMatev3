@@ -14,6 +14,13 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Camera,
   Mic,
   MicOff,
@@ -22,6 +29,7 @@ import {
   UserCircle2,
   Settings,
   SkipForward,
+  Share,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -34,7 +42,23 @@ interface MatchInfo {
     level: string;
   };
   isOnline: boolean;
+  tags: string[];
 }
+
+const AVAILABLE_TAGS = [
+  'Mathematics',
+  'Physics',
+  'Computer Science',
+  'Chemistry',
+  'Biology',
+  'Literature',
+  'History',
+  'Economics',
+  'Psychology',
+  'Art',
+  'Music',
+  'Languages'
+] as const;
 
 interface VideoPanelProps {
   matchInfo?: MatchInfo;
@@ -55,6 +79,7 @@ const VideoPanel = ({
       level: "Advanced",
     },
     isOnline: true,
+    tags: ["Mathematics", "Physics", "Computer Science"],
   },
   isCameraOn: initialCameraState = true,
   isMicOn: initialMicState = true,
@@ -140,14 +165,64 @@ const VideoPanel = ({
     };
   }, []);
 
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Get roomId from URL if it exists
+  const [roomId, setRoomId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room');
+  });
+
   const handleFindMatch = () => {
     setIsSearching(true);
-    signalingService.current?.findMatch();
+    if (!selectedTags.length) {
+      toast({
+        title: "Selection Required",
+        description: "Please select at least one interest before finding a partner.",
+        variant: "destructive",
+      });
+      setIsSearching(false);
+      return;
+    }
+
+    if (roomId) {
+      console.log('Joining existing room:', roomId);
+      signalingService.current?.joinRoom(roomId);
+      toast({
+        title: "Joining Study Session",
+        description: "Connecting to your study partner...",
+      });
+    } else {
+      // Generate a unique room ID for sharing
+      const newRoomId = crypto.randomUUID();
+      setRoomId(newRoomId);
+      signalingService.current?.findMatch(selectedTags, newRoomId);
+    }
+  };
+
+  const handleShare = () => {
+    if (roomId) {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+      navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link Copied!",
+        description: "Share this link with a friend to study together.",
+        duration: 3000,
+      });
+    }
   };
 
   const handleSkip = () => {
+    if (!selectedTags.length) {
+      toast({
+        title: "Selection Required",
+        description: "Please select at least one interest before finding a new partner.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSearching(true);
-    signalingService.current?.skipPeer();
+    signalingService.current?.skipPeer(selectedTags);
   };
 
   const handleToggleCamera = () => {
@@ -200,15 +275,59 @@ const VideoPanel = ({
             ) : (
               <div className="text-center">
                 <UserCircle2 className="h-24 w-24 text-slate-600 mx-auto mb-4" />
+                
+                {/* Tag Selection */}
+                <div className="mb-4 max-w-sm mx-auto">
+                  <Select
+                    onValueChange={(value) => {
+                      if (!selectedTags.includes(value)) {
+                        setSelectedTags([...selectedTags, value]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your interests" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_TAGS.map((tag) => (
+                        <SelectItem 
+                          key={tag} 
+                          value={tag}
+                          disabled={selectedTags.includes(tag)}
+                        >
+                          {tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Selected Tags */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedTags.map((tag) => (
+                      <Badge 
+                        key={tag}
+                        variant="secondary"
+                        className="cursor-pointer"
+                        onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
+                      >
+                        {tag} ×
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
                 <Button
                   onClick={handleFindMatch}
-                  disabled={isSearching}
+                  disabled={isSearching || selectedTags.length === 0}
                   className="mb-2"
                 >
                   {isSearching ? 'Searching...' : 'Find Study Partner'}
                 </Button>
+                {selectedTags.length === 0 && (
+                  <p className="text-sm text-slate-400 mb-2">Select at least one interest to find a study partner</p>
+                )}
                 {isSearching && (
-                  <p className="text-sm text-slate-400">Looking for someone to study with...</p>
+                  <p className="text-sm text-slate-400">Looking for someone with similar interests...</p>
                 )}
               </div>
             )}
@@ -289,16 +408,40 @@ const VideoPanel = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          {isConnected && (
-            <Button
-              variant="secondary"
-              onClick={handleSkip}
-              className="flex items-center gap-2"
-            >
-              <SkipForward className="h-4 w-4" />
-              Skip
-            </Button>
-          )}
+          {isConnected ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleSkip}
+                className="flex items-center gap-2"
+              >
+                <SkipForward className="h-4 w-4" />
+                Skip
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleShare}
+                className="flex items-center gap-2"
+              >
+                <Share className="h-4 w-4" />
+                Share Link
+              </Button>
+            </>
+          ) : roomId ? (
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Waiting for your friend to join...
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleShare}
+                className="flex items-center gap-2"
+              >
+                <Share className="h-4 w-4" />
+                Share Link
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">

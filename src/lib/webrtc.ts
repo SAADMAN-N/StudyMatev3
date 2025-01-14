@@ -73,6 +73,12 @@ export class WebRTCManager {
           muted: t.muted,
           readyState: t.readyState
         })));
+        console.log('Stream tracks:', remoteStream.getTracks().map(t => ({
+          kind: t.kind,
+          enabled: t.enabled,
+          muted: t.muted,
+          readyState: t.readyState
+        })));
         
         if (this.onStreamCallback) {
           console.log('Calling stream callback with remote stream');
@@ -87,7 +93,13 @@ export class WebRTCManager {
       });
 
       peer.on('connect', () => {
-        console.log('Peer connection established');
+        console.log('Peer connection established with stream:', stream.id);
+        console.log('Stream tracks:', stream.getTracks().map(t => ({
+          kind: t.kind,
+          enabled: t.enabled,
+          muted: t.muted,
+          readyState: t.readyState
+        })));
       });
 
       peer.on('close', () => {

@@ -9,13 +9,17 @@
 
 ### Frontend (Vercel)
 - Environment Variables:
-  - VITE_SIGNALING_SERVER: URL of the signaling server
+  - VITE_SIGNALING_SERVER: URL of the signaling server (e.g., https://your-signaling-server.onrender.com)
 - Build Command: npm run build
 - Output Directory: dist
 - Node.js Version: >=18.0.0
 - Build Settings:
   - Add .npmrc with legacy-peer-deps=true
   - Use engine-strict=true to enforce Node version
+- After deploying signaling server:
+  1. Add VITE_SIGNALING_SERVER env var in Vercel
+  2. Enable for all environments (Production, Preview, Development)
+  3. Redeploy after adding the environment variable
 
 ### Local Development
 1. Copy .env.example to .env

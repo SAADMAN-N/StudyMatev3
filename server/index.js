@@ -128,18 +128,21 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('skip', () => {
-    console.log('User skipping:', socket.id);
+  socket.on('skip', ({ tags }) => {
+    console.log('User skipping:', socket.id, 'with tags:', tags);
     // Clean up old connection
     const oldPeer = activeConnections.get(socket.id);
     if (oldPeer) {
-      activeConnections.delete(socket.id);
-      activeConnections.delete(oldPeer);
       io.to(oldPeer).emit('peer-left', socket.id);
     }
 
     // Find new match
-    const match = findMatch(socket, selectedTags);
+    const match = findMatch(socket, tags);
+      activeConnections.delete(socket.id);
+      activeConnections.delete(oldPeer);
+    // Get user's tags from waiting pool or use empty array
+    const userTags = waitingUsers.get(socket.id)?.tags || [];
+    const match = findMatch(socket, userTags);
     if (match) {
       socket.emit('matched', match);
       io.to(match).emit('matched', socket.id);
