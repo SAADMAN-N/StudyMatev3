@@ -168,9 +168,9 @@ const VideoPanel = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Get roomId from URL if it exists
-  const [roomId, setRoomId] = useState<string | null>(() => {
+  const [roomId, setRoomId] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('room');
+    return params.get('room') || '';
   });
 
   const handleFindMatch = () => {
@@ -185,19 +185,17 @@ const VideoPanel = ({
       return;
     }
 
-    if (roomId) {
-      console.log('Joining existing room:', roomId);
-      signalingService.current?.joinRoom(roomId);
-      toast({
-        title: "Joining Study Session",
-        description: "Connecting to your study partner...",
-      });
-    } else {
-      // Generate a unique room ID for sharing
-      const newRoomId = crypto.randomUUID();
-      setRoomId(newRoomId);
-      signalingService.current?.findMatch(selectedTags, newRoomId);
-    }
+    // Generate a unique room ID for sharing
+    const newRoomId = crypto.randomUUID();
+    setRoomId(newRoomId);
+    signalingService.current?.findMatch(selectedTags, newRoomId);
+    
+    // Show room ID created notification
+    toast({
+      title: "Room Created",
+      description: "Share the Room ID with your study partner to connect",
+      duration: 5000,
+    });
   };
 
   const handleShare = () => {
@@ -265,13 +263,26 @@ const VideoPanel = ({
           {/* Remote video (main view) */}
           <div className="w-full h-full flex items-center justify-center">
             {isConnected ? (
-              <video
-                ref={remoteVideoRef}
-                className="w-full h-full object-cover"
-                autoPlay
-                playsInline
-                muted={false}
-              />
+              <>
+                <video
+                  ref={remoteVideoRef}
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  playsInline
+                  muted={false}
+                  onError={(e) => {
+                    console.error('Video error:', e);
+                    toast({
+                      title: "Video Error",
+                      description: "Failed to play remote video stream. Please check permissions.",
+                      variant: "destructive",
+                    });
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <p className="text-white">Connecting video stream...</p>
+                </div>
+              </>
             ) : (
               <div className="text-center">
                 <UserCircle2 className="h-24 w-24 text-slate-600 mx-auto mb-4" />
@@ -316,19 +327,74 @@ const VideoPanel = ({
                   </div>
                 </div>
 
-                <Button
-                  onClick={handleFindMatch}
-                  disabled={isSearching || selectedTags.length === 0}
-                  className="mb-2"
-                >
-                  {isSearching ? 'Searching...' : 'Find Study Partner'}
-                </Button>
-                {selectedTags.length === 0 && (
-                  <p className="text-sm text-slate-400 mb-2">Select at least one interest to find a study partner</p>
-                )}
-                {isSearching && (
-                  <p className="text-sm text-slate-400">Looking for someone with similar interests...</p>
-                )}
+                <div className="space-y-4">
+                  <Button
+                    onClick={handleFindMatch}
+                    disabled={isSearching || selectedTags.length === 0}
+                    className="mb-2"
+                  >
+                    {isSearching ? 'Searching...' : 'Find Study Partner'}
+                  </Button>
+
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={roomId || ''}
+                        readOnly
+                        placeholder="Room ID will appear here"
+                        className="px-3 py-2 bg-slate-700 rounded text-sm w-full"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (roomId) {
+                            navigator.clipboard.writeText(roomId);
+                            toast({
+                              title: "Room ID Copied!",
+                              description: "Share this ID with your study partner",
+                              duration: 3000,
+                            });
+                          }
+                        }}
+                        disabled={!roomId}
+                      >
+                        Copy ID
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        placeholder="Enter Room ID to join"
+                        className="px-3 py-2 bg-slate-700 rounded text-sm w-full"
+                        onChange={(e) => setRoomId(e.target.value)}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (roomId) {
+                            signalingService.current?.joinRoom(roomId);
+                            toast({
+                              title: "Joining Room",
+                              description: "Connecting to your study partner...",
+                            });
+                          }
+                        }}
+                        disabled={!roomId}
+                      >
+                        Join
+                      </Button>
+                    </div>
+                  </div>
+
+                  {selectedTags.length === 0 && (
+                    <p className="text-sm text-slate-400">Select at least one interest to find a study partner</p>
+                  )}
+                  {isSearching && (
+                    <p className="text-sm text-slate-400">Looking for someone with similar interests...</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
