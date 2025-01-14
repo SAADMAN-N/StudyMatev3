@@ -12,6 +12,10 @@
   - VITE_SIGNALING_SERVER: URL of the signaling server
 - Build Command: npm run build
 - Output Directory: dist
+- Node.js Version: >=18.0.0
+- Build Settings:
+  - Add .npmrc with legacy-peer-deps=true
+  - Use engine-strict=true to enforce Node version
 
 ### Local Development
 1. Copy .env.example to .env
