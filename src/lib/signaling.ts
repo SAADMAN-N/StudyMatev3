@@ -135,6 +135,8 @@ export class SignalingService {
 
   public joinRoom(roomId: string) {
     console.log('Joining room:', roomId);
+    console.log('Current socket ID:', this.socket.id);
+    console.log('Socket connection status:', this.socket.connected);
     this.socket.emit('join-room', { roomId });
     
     // Add error handler for room joining
