@@ -10,6 +10,9 @@
 ### Frontend (Vercel)
 - Environment Variables:
   - VITE_SIGNALING_SERVER: URL of the signaling server (e.g., https://your-signaling-server.onrender.com)
+  - Must use HTTPS URL in production
+  - Must include full URL with protocol (https://)
+  - Local development can use http://localhost:3001
 - Build Command: npm run build
 - Output Directory: dist
 - Node.js Version: >=18.0.0
@@ -20,6 +23,18 @@
   1. Add VITE_SIGNALING_SERVER env var in Vercel
   2. Enable for all environments (Production, Preview, Development)
   3. Redeploy after adding the environment variable
+- Authentication:
+  1. Go to project Settings > Authentication
+  2. Disable "Require Authentication" to make site public
+  3. This allows users to access without Vercel sign-in
+- Redeploying Latest Changes:
+  1. Dashboard Method (Recommended):
+     - Go to project on vercel.com
+     - Click "Deployments" tab
+     - Click "Redeploy" on latest deployment
+     - Choose "Use the same Build Cache" for faster builds
+  2. CLI Method (Requires login):
+     - Run: vercel deploy --prod
 
 ### Local Development
 1. Copy .env.example to .env
@@ -85,6 +100,12 @@ For collaborative editing features:
 - Real-time updates for collaboration
 
 ## Video Chat Implementation
+- When testing WebRTC connections:
+  - Check browser console for connection logs
+  - Ensure both peers have camera/microphone permissions
+  - Verify STUN/TURN servers are reachable
+  - Both peers must be on HTTPS or localhost
+  - Check NAT traversal by testing on different networks
 - Uses WebRTC via simple-peer library for peer-to-peer video calls
 - Local media streams are cleaned up on component unmount
 - Video/audio tracks can be individually toggled  - When using simple-peer with Vite:
