@@ -1,4 +1,24 @@
 ## Project Structure
+
+## Deployment
+
+### Signaling Server (Render.com)
+- Deploy server directory as a Node.js service
+- Set PORT environment variable to 3001
+- Enable CORS for frontend domain
+
+### Frontend (Vercel)
+- Environment Variables:
+  - VITE_SIGNALING_SERVER: URL of the signaling server
+- Build Command: npm run build
+- Output Directory: dist
+
+### Local Development
+1. Copy .env.example to .env
+2. Set VITE_SIGNALING_SERVER to local or deployed signaling server
+3. Run server: cd server && npm start
+4. Run frontend: npm run dev
+
 ```
 src/
   components/     # React components

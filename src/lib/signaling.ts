@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { WebRTCManager } from './webrtc';
+import { toast } from '@/components/ui/use-toast';
 
 export class SignalingService {
   private socket: Socket;
@@ -10,7 +11,8 @@ export class SignalingService {
   constructor(webrtcManager: WebRTCManager) {
     this.webrtcManager = webrtcManager;
     console.log('Connecting to signaling server...');
-    this.socket = io('http://localhost:3001', {
+    const SIGNALING_SERVER = import.meta.env.VITE_SIGNALING_SERVER || 'http://localhost:3001';
+    this.socket = io(SIGNALING_SERVER, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -89,9 +91,37 @@ export class SignalingService {
     });
   }
 
-  public findMatch() {
-    console.log('Looking for a match...');
-    this.socket.emit('find-match');
+  public findMatch(tags: string[], roomId: string) {
+    console.log('Looking for a match with tags:', tags, 'roomId:', roomId);
+    this.socket.emit('find-match', { tags, roomId });
+  }
+
+  public joinRoom(roomId: string) {
+    console.log('Joining room:', roomId);
+    this.socket.emit('join-room', { roomId });
+    
+    // Add error handler for room joining
+    this.socket.once('error', (error) => {
+      console.error('Failed to join room:', error);
+      toast({
+        title: "Connection Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    });
+
+    // Add timeout to detect if connection is taking too long
+    setTimeout(() => {
+      const connection = this.webrtcManager.getConnection(roomId);
+      if (!connection) {
+        console.error('Connection timeout - no peer connection established');
+        toast({
+          title: "Connection Timeout",
+          description: "Failed to establish connection. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }, 10000); // 10 second timeout
   }
 
   public skipPeer() {
