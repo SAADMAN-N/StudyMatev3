@@ -15,6 +15,11 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   },
   plugins: [
     react({
@@ -26,6 +31,26 @@ export default defineConfig({
     preserveSymlinks: true,
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      stream: 'stream-browserify',
+      buffer: 'buffer',
+      util: 'util/',
+      process: 'process/browser',
+      events: 'events',
+      inherits: 'inherits'
     },
   },
+  define: {
+    global: 'globalThis',
+    'process.env': {},
+    'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.VITE_OPENAI_API_KEY)
+  },
+  server: {
+    proxy: {
+      '/api/anthropic': {
+        target: 'https://api.anthropic.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/anthropic/, '')
+      }
+    }
+  }
 });

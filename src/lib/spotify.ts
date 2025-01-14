@@ -1,17 +1,17 @@
 const CLIENT_ID = "05c0b3929ba24882a527304104272769";
-const REDIRECT_URI = "https://serene-proskuriakova2-ce8je.dev.tempolabs.ai";
+const REDIRECT_URI = "http://localhost:5173";
 const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
 const RESPONSE_TYPE = "token";
 const SCOPES = [
-  "user-read-private",
+  "streaming",
   "user-read-email",
+  "user-read-private",
   "user-read-playback-state",
   "user-modify-playback-state",
   "user-read-currently-playing",
-  "playlist-read-private",
   "user-library-read",
-  "streaming",
-  "user-modify-playback-state",
+  "playlist-read-private",
+  "app-remote-control",
 ].join(" ");
 
 export const loginUrl = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=${RESPONSE_TYPE}&scope=${encodeURIComponent(SCOPES)}`;
@@ -38,6 +38,18 @@ export const getAccessTokenFromUrl = () => {
 };
 
 export const spotifyApi = {
+  async getDevices(token: string) {
+    const response = await fetch("https://api.spotify.com/v1/me/player/devices", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = new Error(`HTTP error! status: ${response.status}`);
+      (error as any).status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+
   async getCurrentUser(token: string) {
     const response = await fetch("https://api.spotify.com/v1/me", {
       headers: { Authorization: `Bearer ${token}` },
@@ -134,6 +146,21 @@ export const spotifyApi = {
       "https://api.spotify.com/v1/me/player/previous",
       {
         method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (!response.ok) {
+      const error = new Error(`HTTP error! status: ${response.status}`);
+      (error as any).status = response.status;
+      throw error;
+    }
+  },
+
+  async setVolume(token: string, volumePercent: number) {
+    const response = await fetch(
+      `https://api.spotify.com/v1/me/player/volume?volume_percent=${volumePercent}`,
+      {
+        method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
       },
     );

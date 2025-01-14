@@ -15,7 +15,7 @@ const ToolsPanel = ({
   onTabChange = () => {},
 }: ToolsPanelProps) => {
   return (
-    <div className="w-[605px] h-[982px] bg-background border-l border-border p-4">
+    <div className="w-[605px] h-[982px] bg-slate-900 border-l border-slate-800 p-4">
       <Tabs
         defaultValue={activeTab}
         className="h-full"

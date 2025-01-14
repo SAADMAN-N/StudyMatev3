@@ -1,4 +1,7 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import SimplePeer from "simple-peer";
+import { WebRTCManager } from "@/lib/webrtc";
+import { SignalingService } from "@/lib/signaling";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +21,9 @@ import {
   VideoOff,
   UserCircle2,
   Settings,
+  SkipForward,
 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface MatchInfo {
   name: string;
@@ -51,26 +56,163 @@ const VideoPanel = ({
     },
     isOnline: true,
   },
-  isCameraOn = true,
-  isMicOn = true,
-  onToggleCamera = () => {},
-  onToggleMic = () => {},
-  onOpenSettings = () => {},
+  isCameraOn: initialCameraState = true,
+  isMicOn: initialMicState = true,
+  onToggleCamera,
+  onToggleMic,
+  onOpenSettings,
 }: VideoPanelProps) => {
+  const { toast } = useToast();
+  const [isCameraOn, setIsCameraOn] = useState(initialCameraState);
+  const [isMicOn, setIsMicOn] = useState(initialMicState);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const webrtcManager = useRef<WebRTCManager>(new WebRTCManager());
+  const signalingService = useRef<SignalingService>();
+
+  useEffect(() => {
+    const initializeStream = async () => {
+      try {
+        const stream = await webrtcManager.current.getLocalStream();
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+
+        // Initialize signaling service after getting local stream
+        signalingService.current = new SignalingService(webrtcManager.current);
+        
+        signalingService.current.onPeerConnected(() => {
+          setIsConnected(true);
+          setIsSearching(false);
+        });
+
+        signalingService.current.onPeerDisconnected(() => {
+          setIsConnected(false);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = null;
+          }
+        });
+
+        // Handle remote stream
+        webrtcManager.current.onStream((stream) => {
+          console.log('Received remote stream in VideoPanel');
+          // Use a small delay to ensure ref is mounted
+          setTimeout(() => {
+            if (remoteVideoRef.current) {
+              console.log('Setting remote video source');
+              remoteVideoRef.current.srcObject = stream;
+              // Ensure video starts playing
+              const playPromise = remoteVideoRef.current.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                  console.error('Failed to play remote video:', error);
+                });
+              }
+            } else {
+              console.warn('Remote video ref not available');
+            }
+          }, 100);
+        });
+      } catch (error) {
+        console.error('Failed to get camera/microphone access:', error);
+        
+        let errorMessage = "Failed to access camera and microphone.";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: "Camera Access Error",
+          description: errorMessage + " Please ensure you're using a modern browser and have granted the necessary permissions.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    };
+
+    initializeStream();
+
+    return () => {
+      signalingService.current?.disconnect();
+      webrtcManager.current.cleanup();
+    };
+  }, []);
+
+  const handleFindMatch = () => {
+    setIsSearching(true);
+    signalingService.current?.findMatch();
+  };
+
+  const handleSkip = () => {
+    setIsSearching(true);
+    signalingService.current?.skipPeer();
+  };
+
+  const handleToggleCamera = () => {
+    const newState = !isCameraOn;
+    setIsCameraOn(newState);
+    webrtcManager.current.toggleVideo(newState);
+    onToggleCamera?.();
+  };
+
+  const handleToggleMic = () => {
+    const newState = !isMicOn;
+    setIsMicOn(newState);
+    webrtcManager.current.toggleAudio(newState);
+    onToggleMic?.();
+  };
+
   return (
-    <Card className="w-full h-full bg-slate-900 flex flex-col">
+    <Card className="w-full h-full bg-slate-800 flex flex-col">
       {/* Main video area */}
       <div className="flex-1 relative">
-        {/* Video placeholder or stream */}
-        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center">
-          {isCameraOn ? (
-            <video
-              className="w-full h-full object-cover"
-              poster="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=800&fit=crop"
-            />
-          ) : (
-            <UserCircle2 className="h-24 w-24 text-slate-600" />
-          )}
+        {/* Video streams */}
+        <div className="absolute inset-0 bg-slate-800 flex">
+          {/* Local video */}
+          <div className="absolute top-4 right-4 w-48 h-36 bg-slate-700 rounded-lg overflow-hidden">
+            {isCameraOn ? (
+              <video
+                ref={localVideoRef}
+                className="w-full h-full object-cover"
+                autoPlay
+                playsInline
+                muted // Mute local video to prevent feedback
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <UserCircle2 className="h-12 w-12 text-slate-600" />
+              </div>
+            )}
+          </div>
+
+          {/* Remote video (main view) */}
+          <div className="w-full h-full flex items-center justify-center">
+            {isConnected ? (
+              <video
+                ref={remoteVideoRef}
+                className="w-full h-full object-cover"
+                autoPlay
+                playsInline
+                muted={false}
+              />
+            ) : (
+              <div className="text-center">
+                <UserCircle2 className="h-24 w-24 text-slate-600 mx-auto mb-4" />
+                <Button
+                  onClick={handleFindMatch}
+                  disabled={isSearching}
+                  className="mb-2"
+                >
+                  {isSearching ? 'Searching...' : 'Find Study Partner'}
+                </Button>
+                {isSearching && (
+                  <p className="text-sm text-slate-400">Looking for someone to study with...</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Match info overlay */}
@@ -105,14 +247,14 @@ const VideoPanel = ({
 
       {/* Control bar */}
       <div className="p-4 bg-muted flex items-center justify-between">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-4">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant={isCameraOn ? "default" : "destructive"}
                   size="icon"
-                  onClick={onToggleCamera}
+                  onClick={handleToggleCamera}
                 >
                   {isCameraOn ? (
                     <Video className="h-5 w-5" />
@@ -133,7 +275,7 @@ const VideoPanel = ({
                 <Button
                   variant={isMicOn ? "default" : "destructive"}
                   size="icon"
-                  onClick={onToggleMic}
+                  onClick={handleToggleMic}
                 >
                   {isMicOn ? (
                     <Mic className="h-5 w-5" />
@@ -147,6 +289,16 @@ const VideoPanel = ({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {isConnected && (
+            <Button
+              variant="secondary"
+              onClick={handleSkip}
+              className="flex items-center gap-2"
+            >
+              <SkipForward className="h-4 w-4" />
+              Skip
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

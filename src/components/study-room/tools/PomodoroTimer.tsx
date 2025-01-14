@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { Play, Pause, RotateCcw, Settings } from "lucide-react";
 
 interface PomodoroTimerProps {
@@ -63,22 +64,16 @@ const PomodoroTimer = ({
         </TabsList>
 
         <TabsContent value="timer" className="space-y-8">
-          <div className="relative w-64 h-64 mx-auto mt-4">
-            {/* Circular progress background */}
-            <div className="absolute inset-0 rounded-full border-8 border-muted" />
-
-            {/* Circular progress indicator */}
-            <div
-              className="absolute inset-0 rounded-full border-8 border-primary"
-              style={{
-                clipPath: `polygon(50% 50%, -50% -50%, ${calculateProgress()}% 0%, ${calculateProgress()}% 100%)`,
-              }}
-            />
-
-            {/* Timer display */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-4xl font-bold">{formatTime(timeLeft)}</span>
+          <div className="relative w-64 h-64 mx-auto mt-4 flex items-center justify-center">
+            <div className="absolute inset-0">
+              <Progress 
+                value={calculateProgress()} 
+                className="h-full w-full rounded-full"
+              />
             </div>
+            <span className="text-4xl font-bold relative z-10">
+              {formatTime(timeLeft)}
+            </span>
           </div>
 
           <div className="flex justify-center space-x-4">
