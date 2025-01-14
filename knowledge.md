@@ -13,7 +13,7 @@
 
 ### Frontend (Vercel)
 - Environment Variables:
-  - VITE_SIGNALING_SERVER: URL of the signaling server (e.g., https://your-signaling-server.onrender.com)
+  - VITE_SIGNALING_SERVER: URL of the signaling server (e.g., https://studymate-signaling.onrender.com)
   - Must use HTTPS URL in production
   - Must include full URL with protocol (https://)
   - Local development can use http://localhost:3001

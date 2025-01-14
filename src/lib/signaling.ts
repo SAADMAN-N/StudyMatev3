@@ -15,7 +15,7 @@ export class SignalingService {
     
     // In production, force HTTPS
     const SIGNALING_SERVER = import.meta.env.VITE_SIGNALING_SERVER || 
-      (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-render-url.onrender.com');
+      (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://studymate-signaling.onrender.com');
     
     console.log('Connecting to signaling server:', SIGNALING_SERVER);
     console.log('Environment:', import.meta.env.MODE);
