@@ -29,6 +29,8 @@ const rooms = new Map(); // roomId -> { creator: string, joined: string }
 function findMatch(socket, userTags) {
   userTags = userTags || [];
   console.log('Finding match for user:', socket.id, 'with tags:', userTags);
+  console.log('Current waiting users:', Array.from(waitingUsers.entries()));
+  console.log('Current active connections:', Array.from(activeConnections.entries()));
   
   // Remove user from waiting pool if they were there
   waitingUsers.delete(socket.id);
@@ -123,6 +125,8 @@ io.on('connection', (socket) => {
 
   socket.on('signal', ({ peerId, signal }) => {
     console.log('Forwarding signal from', socket.id, 'to', peerId);
+    console.log('Signal type:', signal.type);
+    console.log('Active connections:', Array.from(activeConnections.entries()));
     io.to(peerId).emit('signal', {
       peerId: socket.id,
       signal: signal
@@ -139,11 +143,8 @@ io.on('connection', (socket) => {
       activeConnections.delete(oldPeer);
     }
 
-    // Find new match
+    // Find new match with provided tags
     const match = findMatch(socket, tags);
-    // Get user's tags from waiting pool or use empty array
-    const userTags = waitingUsers.get(socket.id)?.tags || [];
-    const match = findMatch(socket, userTags);
     if (match) {
       socket.emit('matched', match);
       io.to(match).emit('matched', socket.id);
