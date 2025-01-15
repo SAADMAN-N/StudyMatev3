@@ -172,11 +172,14 @@ For collaborative editing features:
           - Monitor all connection states (connection, ICE, signaling) for debugging
           - Use multiple STUN servers for better NAT traversal
           - Handle signaling state conflicts:
-            - Check signaling state before applying signals
+            - Check signaling state before applying signals (offer->stable, answer->have-local-offer)
             - Use rollback for conflicting offers
             - Add delay between signal operations
             - Implement retry mechanism for failed connections
-            - Log signaling states and operations for debugging
+            - Log all connection states (signaling, ICE, connection) for debugging
+            - Monitor connection state changes and retry on failure
+            - Create new peer connection when receiving offer without existing connection
+            - Handle connection failures by recreating the connection
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable

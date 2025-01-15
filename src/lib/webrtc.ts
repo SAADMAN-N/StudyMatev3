@@ -82,6 +82,26 @@ export class WebRTCManagerImpl implements WebRTCManager {
           await this.initializePeer(userId, initiator, retryCount + 1);
         }
       });
+
+      // Monitor connection state changes
+      const pc = (peer as any).pc;
+      if (pc) {
+        pc.onconnectionstatechange = () => {
+          console.log('Connection state changed:', pc.connectionState);
+          if (pc.connectionState === 'failed') {
+            console.log('Connection failed, retrying...');
+            this.initializePeer(userId, initiator, retryCount + 1);
+          }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          console.log('ICE connection state changed:', pc.iceConnectionState);
+        };
+
+        pc.onsignalingstatechange = () => {
+          console.log('Signaling state changed:', pc.signalingState);
+        };
+      }
       peer.on('connect', () => console.log('Peer connected'));
       peer.on('close', () => console.log('Peer closed'));
 
@@ -99,7 +119,15 @@ export class WebRTCManagerImpl implements WebRTCManager {
 
   async handleSignal(userId: string, signal: SimplePeer.SignalData) {
     try {
-      const connection = this.connections.get(userId);
+      let connection = this.connections.get(userId);
+      
+      // If receiving an offer and no connection exists, create one
+      if (!connection && signal.type === 'offer') {
+        console.log('Creating new peer as receiver');
+        await this.initializePeer(userId, false);
+        connection = this.connections.get(userId);
+      }
+
       if (!connection) {
         console.log('No connection found for peer:', userId);
         return;
@@ -107,25 +135,34 @@ export class WebRTCManagerImpl implements WebRTCManager {
 
       const pc = (connection.peer as any).pc;
       if (pc) {
-        const currentState = pc.signalingState;
-        console.log('Current signaling state:', currentState);
+        console.log('Current signaling state:', pc.signalingState);
+        console.log('Connection state:', pc.connectionState);
+        console.log('ICE connection state:', pc.iceConnectionState);
         console.log('Received signal type:', signal.type);
 
         // Handle different signaling states
-        if (signal.type === 'offer' && currentState !== 'stable') {
-          console.log('Rolling back pending operations...');
-          await pc.setLocalDescription({ type: 'rollback' });
+        if (signal.type === 'offer') {
+          if (pc.signalingState !== 'stable') {
+            console.log('Rolling back pending operations...');
+            await pc.setLocalDescription({ type: 'rollback' });
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } else if (signal.type === 'answer') {
+          if (pc.signalingState !== 'have-local-offer') {
+            console.log('Invalid state for answer, waiting...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
-
-        // Add a small delay to ensure signaling state is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       connection.peer.signal(signal);
     } catch (error) {
       console.error('Error handling signal:', error);
-      // Try to recover by closing and recreating the connection
-      this.closeConnection(userId);
+      // Only recreate connection if it's a signaling error
+      if (error.message.includes('setRemoteDescription')) {
+        console.log('Signaling error, recreating connection...');
+        await this.initializePeer(userId, false);
+      }
     }
   }
 
