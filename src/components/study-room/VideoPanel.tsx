@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { WebRTCManager } from "@/lib/webrtc";
+import { WebRTCManager, WebRTCManagerImpl } from "@/lib/webrtc";
 import { SignalingService } from "@/lib/signaling";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Card } from "@/components/ui/card";
@@ -34,7 +34,7 @@ export default function VideoPanel() {
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const webrtcManager = useRef<WebRTCManager>(new WebRTCManager());
+  const webrtcManager = useRef<WebRTCManager>(new WebRTCManagerImpl());
   const signalingService = useRef<SignalingService>();
 
   useEffect(() => {
@@ -45,12 +45,16 @@ export default function VideoPanel() {
           localVideoRef.current.srcObject = stream;
         }
 
-        // Initialize signaling service after getting local stream
         signalingService.current = new SignalingService(webrtcManager.current);
         
         signalingService.current.onPeerConnected(() => {
           setIsConnected(true);
           setIsSearching(false);
+          toast({
+            title: "Connected",
+            description: "You are now connected with a study partner",
+            duration: 3000,
+          });
         });
 
         signalingService.current.onPeerDisconnected(() => {
@@ -58,9 +62,14 @@ export default function VideoPanel() {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
           }
+          toast({
+            title: "Disconnected",
+            description: "Your study partner has disconnected",
+            variant: "destructive",
+            duration: 3000,
+          });
         });
 
-        // Handle remote stream
         webrtcManager.current.onStream((stream) => {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
@@ -116,11 +125,8 @@ export default function VideoPanel() {
 
   return (
     <Card className="w-full h-full bg-slate-800 flex flex-col">
-      {/* Main video area */}
       <div className="flex-1 relative">
-        {/* Video streams */}
         <div className="absolute inset-0 bg-slate-800 flex">
-          {/* Local video */}
           <div className="absolute top-4 right-4 w-48 h-36 bg-slate-700 rounded-lg overflow-hidden">
             {isCameraOn ? (
               <video
@@ -137,7 +143,6 @@ export default function VideoPanel() {
             )}
           </div>
 
-          {/* Remote video (main view) */}
           <div className="w-full h-full flex items-center justify-center">
             {isConnected ? (
               <video
@@ -150,7 +155,6 @@ export default function VideoPanel() {
               <div className="text-center">
                 <UserCircle2 className="h-24 w-24 text-slate-600 mx-auto mb-4" />
                 
-                {/* Tag Selection */}
                 <div className="mb-4 max-w-sm mx-auto">
                   <Select
                     onValueChange={(value) => {
@@ -160,7 +164,7 @@ export default function VideoPanel() {
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select your interests" />
+                      <SelectValue placeholder="Select your interests (optional)" />
                     </SelectTrigger>
                     <SelectContent>
                       {AVAILABLE_TAGS.map((tag) => (
@@ -175,7 +179,6 @@ export default function VideoPanel() {
                     </SelectContent>
                   </Select>
                   
-                  {/* Selected Tags */}
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedTags.map((tag) => (
                       <Badge 
@@ -203,7 +206,6 @@ export default function VideoPanel() {
         </div>
       </div>
 
-      {/* Control bar */}
       <div className="p-4 bg-muted flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button

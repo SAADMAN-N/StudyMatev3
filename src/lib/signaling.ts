@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { WebRTCManager } from './webrtc';
+import { WebRTCManager, WebRTCManagerImpl } from './webrtc';
 
 export class SignalingService {
   private socket: Socket;
@@ -15,7 +15,7 @@ export class SignalingService {
       (window.location.hostname === 'localhost' ? 'http://localhost:3002' : 'https://studymate-signaling.onrender.com');
     
     this.socket = io(SIGNALING_SERVER, {
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
@@ -58,7 +58,7 @@ export class SignalingService {
             }
           });
         }
-        await this.webrtcManager.handleSignal(peerId, signal);
+        this.webrtcManager.handleSignal(peerId, signal);
       } catch (error) {
         console.error('Failed to handle signal:', error);
       }
@@ -66,22 +66,21 @@ export class SignalingService {
 
     this.socket.on('peer-left', (peerId: string) => {
       this.webrtcManager.closeConnection(peerId);
-      this.onPeerDisconnectedCallback?.();
+      if (this.onPeerDisconnectedCallback) {
+        this.onPeerDisconnectedCallback();
+      }
     });
   }
 
   public findMatch(tags: string[]) {
-    console.log('Looking for a match with tags:', tags);
     this.socket.emit('find-match', { tags });
   }
 
   public skipPeer(tags: string[]) {
-    console.log('Skipping current peer with tags:', tags);
     this.socket.emit('skip', { tags });
   }
 
   public disconnect() {
-    console.log('Disconnecting from signaling server...');
     this.socket.disconnect();
   }
 

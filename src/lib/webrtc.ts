@@ -7,21 +7,34 @@ export interface PeerConnection {
 
 type StreamCallback = (stream: MediaStream) => void;
 
-export class WebRTCManager {
-  public connections: Map<string, PeerConnection> = new Map();
-  private localStream: MediaStream | null = null;
+export interface WebRTCManager {
+  connections: Map<string, PeerConnection>;
+  getLocalStream(): Promise<MediaStream>;
+  onStream(callback: StreamCallback): void;
+  initializePeer(userId: string, initiator: boolean): Promise<SimplePeer.Instance>;
+  handleSignal(userId: string, signal: SimplePeer.SignalData): void;
+  getConnection(userId: string): PeerConnection | undefined;
+  closeConnection(userId: string): void;
+  toggleAudio(enabled: boolean): void;
+  toggleVideo(enabled: boolean): void;
+  cleanup(): void;
+}
+
+export class WebRTCManagerImpl implements WebRTCManager {
+  public readonly connections = new Map<string, PeerConnection>();
+  private readonly localStream: MediaStream | null = null;
   private onStreamCallback?: StreamCallback;
 
   async getLocalStream(): Promise<MediaStream> {
     if (this.localStream) return this.localStream;
     
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
-      
-      return this.localStream;
+      (this as any).localStream = stream;
+      return stream;
     } catch (error) {
       console.error('Failed to get local stream:', error);
       throw error;
@@ -32,7 +45,7 @@ export class WebRTCManager {
     this.onStreamCallback = callback;
   }
 
-  async initializePeer(userId: string, initiator: boolean = false): Promise<SimplePeer.Instance> {
+  async initializePeer(userId: string, initiator: boolean): Promise<SimplePeer.Instance> {
     this.closeConnection(userId);
 
     try {
@@ -44,32 +57,10 @@ export class WebRTCManager {
         trickle: false,
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' }
           ]
-        },
-        sdpTransform: (sdp) => {
-          // Log the SDP for debugging
-          console.log('SDP:', sdp);
-          return sdp;
         }
       }) as SimplePeer.Instance;
-
-      // Monitor connection state changes
-      const pc = (peer as any).pc;
-      if (pc) {
-        pc.onconnectionstatechange = () => {
-          console.log('Connection state:', pc.connectionState);
-        };
-        pc.oniceconnectionstatechange = () => {
-          console.log('ICE connection state:', pc.iceConnectionState);
-        };
-        pc.onsignalingstatechange = () => {
-          console.log('Signaling state:', pc.signalingState);
-        };
-      }
 
       peer.on('stream', (remoteStream: MediaStream) => {
         if (this.onStreamCallback) {
@@ -77,14 +68,7 @@ export class WebRTCManager {
         }
       });
 
-      peer.on('error', (err) => {
-        console.error('Peer error:', err);
-        // Try to recover from errors by recreating the connection
-        if (err.message.includes('setRemoteDescription')) {
-          console.log('Attempting to recover from setRemoteDescription error...');
-          this.closeConnection(userId);
-        }
-      });
+      peer.on('error', (err) => console.error('Peer error:', err));
       peer.on('connect', () => console.log('Peer connected'));
       peer.on('close', () => console.log('Peer closed'));
 
@@ -96,46 +80,14 @@ export class WebRTCManager {
     }
   }
 
-  getConnection(userId: string) {
+  getConnection(userId: string): PeerConnection | undefined {
     return this.connections.get(userId);
   }
 
-  async handleSignal(userId: string, signal: SimplePeer.SignalData) {
-    try {
-      let connection = this.connections.get(userId);
-      
-      if (!connection && signal.type === 'offer') {
-        await this.initializePeer(userId, false);
-        connection = this.connections.get(userId);
-      }
-
-      if (!connection) {
-        console.error('No peer connection found for:', userId);
-        return;
-      }
-
-      // Check signaling state before applying signal
-      const pc = (connection.peer as any).pc;
-      if (pc) {
-        console.log('Current signaling state:', pc.signalingState);
-        
-        // Wait for signaling state to stabilize if needed
-        if (signal.type === 'answer' && pc.signalingState !== 'have-local-offer') {
-          console.log('Invalid state for answer, waiting...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        if (signal.type === 'offer' && pc.signalingState !== 'stable') {
-          console.log('Invalid state for offer, waiting...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
+  handleSignal(userId: string, signal: SimplePeer.SignalData) {
+    const connection = this.connections.get(userId);
+    if (connection) {
       connection.peer.signal(signal);
-    } catch (error) {
-      console.error('Failed to handle signal:', error);
-      // Try to recover by creating a new connection
-      await this.initializePeer(userId, false);
     }
   }
 
