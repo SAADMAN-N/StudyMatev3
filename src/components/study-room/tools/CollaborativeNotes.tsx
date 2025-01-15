@@ -22,6 +22,7 @@ interface Note {
 
 const CollaborativeNotes = () => {
   const { toast } = useToast();
+  const [isSharedDocActive, setIsSharedDocActive] = React.useState(false);
   const [notes, setNotes] = React.useState<Note[]>([
     {
       id: "1",
@@ -209,7 +210,22 @@ const CollaborativeNotes = () => {
 
         <TabsContent value="shared" className="flex-1 h-[calc(100%-40px)]">
           <Card className="p-4 bg-slate-800 h-full">
-            <SharedEditor />
+            {!isSharedDocActive ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <h3 className="text-lg font-medium text-white">
+                  Create or Join a Shared Document
+                </h3>
+                <Button 
+                  onClick={() => setIsSharedDocActive(true)}
+                  className="flex items-center gap-2"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Create New Shared Document
+                </Button>
+              </div>
+            ) : (
+              <SharedEditor />
+            )}
           </Card>
         </TabsContent>
       </Tabs>
