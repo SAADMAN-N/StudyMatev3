@@ -1,6 +1,6 @@
 import SimplePeer from 'simple-peer';
 
-interface PeerConnection {
+export interface PeerConnection {
   peer: SimplePeer.Instance;
   stream: MediaStream;
 }
@@ -16,35 +16,9 @@ export class WebRTCManager {
     if (this.localStream) return this.localStream;
     
     try {
-      // Ensure we're in a secure context
-      if (!window.isSecureContext) {
-        throw new Error('WebRTC requires a secure context (HTTPS or localhost)');
-      }
-
-      // Check if mediaDevices is supported
-      if (!navigator.mediaDevices) {
-        throw new Error('getUserMedia is not implemented in this browser');
-      }
-
-      // Modern browsers
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
-        },
+        video: true,
         audio: true
-      });
-      
-      // Log stream information
-      console.log('Local stream obtained:', {
-        id: this.localStream.id,
-        tracks: this.localStream.getTracks().map(track => ({
-          kind: track.kind,
-          enabled: track.enabled,
-          muted: track.muted,
-          readyState: track.readyState
-        }))
       });
       
       return this.localStream;
@@ -59,27 +33,23 @@ export class WebRTCManager {
   }
 
   async initializePeer(userId: string, initiator: boolean = false): Promise<SimplePeer.Instance> {
-    // Always clean up existing connection first
     this.closeConnection(userId);
 
     try {
       const stream = await this.getLocalStream();
-      console.log('Creating peer with stream:', stream.id, 'as initiator:', initiator);
       
       const peer = new SimplePeer({
         initiator,
         stream,
-        trickle: false, // Disable trickle ICE for simpler signaling
+        trickle: false,
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }, // Use just one STUN server for simplicity
+            { urls: 'stun:stun.l.google.com:19302' }
           ]
         }
       }) as SimplePeer.Instance;
 
-      // Simplified event handlers
       peer.on('stream', (remoteStream: MediaStream) => {
-        console.log('Received remote stream');
         if (this.onStreamCallback) {
           this.onStreamCallback(remoteStream);
         }
@@ -88,7 +58,6 @@ export class WebRTCManager {
       peer.on('error', (err) => console.error('Peer error:', err));
       peer.on('connect', () => console.log('Peer connected'));
       peer.on('close', () => console.log('Peer closed'));
-      peer.on('signal', (data) => console.log('Signal:', data.type));
 
       this.connections.set(userId, { peer, stream });
       return peer;
@@ -106,7 +75,6 @@ export class WebRTCManager {
     try {
       let connection = this.connections.get(userId);
       
-      // If receiving an offer and no connection exists, create one
       if (!connection && signal.type === 'offer') {
         await this.initializePeer(userId, false);
         connection = this.connections.get(userId);
@@ -117,7 +85,6 @@ export class WebRTCManager {
         return;
       }
 
-      // Simple signal handling without complex state management
       connection.peer.signal(signal);
     } catch (error) {
       console.error('Failed to handle signal:', error);
