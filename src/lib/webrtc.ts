@@ -45,11 +45,18 @@ export class WebRTCManagerImpl implements WebRTCManager {
     this.onStreamCallback = callback;
   }
 
-  async initializePeer(userId: string, initiator: boolean): Promise<SimplePeer.Instance> {
+  async initializePeer(userId: string, initiator: boolean, retryCount = 0): Promise<SimplePeer.Instance> {
     this.closeConnection(userId);
 
     try {
+      // Maximum retry attempts
+      if (retryCount >= 3) {
+        throw new Error('Max retry attempts reached');
+      }
+
       const stream = await this.getLocalStream();
+      
+      console.log(`Initializing peer (attempt ${retryCount + 1}/3):`, { userId, initiator });
       
       const peer = new SimplePeer({
         initiator,
@@ -68,7 +75,13 @@ export class WebRTCManagerImpl implements WebRTCManager {
         }
       });
 
-      peer.on('error', (err) => console.error('Peer error:', err));
+      peer.on('error', async (err) => {
+        console.error('Peer error:', err);
+        if (err.message.includes('setRemoteDescription')) {
+          console.log('Retrying peer connection...');
+          await this.initializePeer(userId, initiator, retryCount + 1);
+        }
+      });
       peer.on('connect', () => console.log('Peer connected'));
       peer.on('close', () => console.log('Peer closed'));
 
@@ -84,10 +97,35 @@ export class WebRTCManagerImpl implements WebRTCManager {
     return this.connections.get(userId);
   }
 
-  handleSignal(userId: string, signal: SimplePeer.SignalData) {
-    const connection = this.connections.get(userId);
-    if (connection) {
+  async handleSignal(userId: string, signal: SimplePeer.SignalData) {
+    try {
+      const connection = this.connections.get(userId);
+      if (!connection) {
+        console.log('No connection found for peer:', userId);
+        return;
+      }
+
+      const pc = (connection.peer as any).pc;
+      if (pc) {
+        const currentState = pc.signalingState;
+        console.log('Current signaling state:', currentState);
+        console.log('Received signal type:', signal.type);
+
+        // Handle different signaling states
+        if (signal.type === 'offer' && currentState !== 'stable') {
+          console.log('Rolling back pending operations...');
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+
+        // Add a small delay to ensure signaling state is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
       connection.peer.signal(signal);
+    } catch (error) {
+      console.error('Error handling signal:', error);
+      // Try to recover by closing and recreating the connection
+      this.closeConnection(userId);
     }
   }
 
