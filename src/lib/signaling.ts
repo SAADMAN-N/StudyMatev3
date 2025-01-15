@@ -15,9 +15,10 @@ export class SignalingService {
       (window.location.hostname === 'localhost' ? 'http://localhost:3002' : 'https://studymate-signaling.onrender.com');
     
     this.socket = io(SIGNALING_SERVER, {
-      transports: ['websocket', 'polling'], // Allow fallback to polling
-      reconnectionAttempts: 5,
+      transports: ['websocket'],
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      timeout: 10000
     });
 
     this.setupSocketListeners();
@@ -50,6 +51,10 @@ export class SignalingService {
     });
 
     this.socket.on('signal', async ({ peerId, signal }) => {
+      // Ignore candidate signals if we don't have a connection yet
+      if (!this.webrtcManager.getConnection(peerId) && signal.type === undefined) {
+        return;
+      }
       try {
         console.log('Received signal from peer:', signal.type);
         let connection = this.webrtcManager.getConnection(peerId);

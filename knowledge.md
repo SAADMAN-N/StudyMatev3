@@ -188,12 +188,15 @@ For collaborative editing features:
               - Use basic error handling
               - Enable detailed logging for debugging
               - Don't over-complicate signaling process
-            - Handle signaling states carefully:
-              - Check state before applying signals
-              - Use rollback for conflicting offers
-              - Only create new connections for offer signals
-              - Respect signaling state transitions (stable->have-local-offer->stable)
-              - Retry failed connections with exponential backoff
+            - Handle WebRTC connections reliably:
+              - Use both STUN and TURN servers
+              - Enable trickle ICE with candidate pooling
+              - Force specific video codecs for better compatibility
+              - Monitor and handle all ICE states
+              - Implement ICE restart on failure
+              - Ignore ICE candidates before connection setup
+              - Use WebSocket-only transport when possible
+              - Increase reconnection attempts for signaling
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable

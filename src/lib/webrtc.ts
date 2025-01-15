@@ -61,12 +61,27 @@ export class WebRTCManagerImpl implements WebRTCManager {
       const peer = new SimplePeer({
         initiator,
         stream,
-        trickle: false, // Disable trickle ICE for simpler signaling
+        trickle: true, // Enable trickle ICE for better connectivity
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-          ]
+            { 
+              urls: [
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302',
+                'stun:stun2.l.google.com:19302'
+              ]
+            },
+            {
+              urls: 'turn:numb.viagenie.ca',
+              username: 'webrtc@live.com',
+              credential: 'muazkh'
+            }
+          ],
+          iceCandidatePoolSize: 10
+        },
+        sdpTransform: (sdp) => {
+          // Force VP8 video codec
+          return sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
         }
       });
 
@@ -78,14 +93,50 @@ export class WebRTCManagerImpl implements WebRTCManager {
         }
       });
 
-      peer.on('error', async (err) => {
-        console.error('Peer error:', err);
-        if (err.message.includes('setLocalDescription') || err.message.includes('setRemoteDescription')) {
-          if (retryCount < 3) {
-            console.log('Retrying peer connection...');
-            await this.initializePeer(userId, initiator, retryCount + 1);
+      // Monitor all connection states
+      const pc = (peer as any).pc;
+      if (pc) {
+        pc.onconnectionstatechange = () => {
+          console.log('Connection state:', pc.connectionState);
+          if (pc.connectionState === 'failed') {
+            // Try to restart ICE
+            pc.restartIce();
           }
-        }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'failed') {
+            // Try to restart ICE
+            pc.restartIce();
+          }
+        };
+
+        pc.onicegatheringstatechange = () => {
+          console.log('ICE gathering state:', pc.iceGatheringState);
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            console.log('New ICE candidate:', event.candidate.type);
+          }
+        };
+      }
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+      });
+
+      peer.on('connect', () => {
+        console.log('Peer connected successfully');
+      });
+
+      peer.on('close', () => {
+        console.log('Peer connection closed');
+      });
+
+      peer.on('signal', (data) => {
+        console.log('Signal generated:', data.type || 'candidate');
       });
 
       // Connection events
