@@ -22,7 +22,7 @@ export interface WebRTCManager {
 
 export class WebRTCManagerImpl implements WebRTCManager {
   public readonly connections = new Map<string, PeerConnection>();
-  private readonly localStream: MediaStream | null = null;
+  private localStream: MediaStream | null = null;
   private onStreamCallback?: StreamCallback;
 
   async getLocalStream(): Promise<MediaStream> {
@@ -33,7 +33,7 @@ export class WebRTCManagerImpl implements WebRTCManager {
         video: true,
         audio: true
       });
-      (this as any).localStream = stream;
+      this.localStream = stream;
       return stream;
     } catch (error) {
       console.error('Failed to get local stream:', error);
@@ -45,66 +45,53 @@ export class WebRTCManagerImpl implements WebRTCManager {
     this.onStreamCallback = callback;
   }
 
-  async initializePeer(userId: string, initiator: boolean, retryCount = 0): Promise<SimplePeer.Instance> {
+  async initializePeer(userId: string, initiator: boolean): Promise<SimplePeer.Instance> {
+    // Always clean up existing connection first
     this.closeConnection(userId);
 
     try {
-      // Maximum retry attempts
-      if (retryCount >= 3) {
-        throw new Error('Max retry attempts reached');
-      }
-
       const stream = await this.getLocalStream();
-      
-      console.log(`Initializing peer (attempt ${retryCount + 1}/3):`, { userId, initiator });
       
       const peer = new SimplePeer({
         initiator,
         stream,
-        trickle: false,
+        trickle: true, // Enable trickle ICE for better connectivity
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
           ]
         }
-      }) as SimplePeer.Instance;
+      });
 
+      // Handle remote stream
       peer.on('stream', (remoteStream: MediaStream) => {
+        console.log('Received remote stream');
         if (this.onStreamCallback) {
           this.onStreamCallback(remoteStream);
         }
       });
 
-      peer.on('error', async (err) => {
+      // Basic error handling
+      peer.on('error', (err) => {
         console.error('Peer error:', err);
-        if (err.message.includes('setRemoteDescription')) {
-          console.log('Retrying peer connection...');
-          await this.initializePeer(userId, initiator, retryCount + 1);
-        }
       });
 
-      // Monitor connection state changes
-      const pc = (peer as any).pc;
-      if (pc) {
-        pc.onconnectionstatechange = () => {
-          console.log('Connection state changed:', pc.connectionState);
-          if (pc.connectionState === 'failed') {
-            console.log('Connection failed, retrying...');
-            this.initializePeer(userId, initiator, retryCount + 1);
-          }
-        };
+      // Connection events
+      peer.on('connect', () => {
+        console.log('Peer connected successfully');
+      });
 
-        pc.oniceconnectionstatechange = () => {
-          console.log('ICE connection state changed:', pc.iceConnectionState);
-        };
+      peer.on('close', () => {
+        console.log('Peer connection closed');
+        this.closeConnection(userId);
+      });
 
-        pc.onsignalingstatechange = () => {
-          console.log('Signaling state changed:', pc.signalingState);
-        };
-      }
-      peer.on('connect', () => console.log('Peer connected'));
-      peer.on('close', () => console.log('Peer closed'));
-
+      // Store the connection
       this.connections.set(userId, { peer, stream });
       return peer;
     } catch (error) {
@@ -113,57 +100,15 @@ export class WebRTCManagerImpl implements WebRTCManager {
     }
   }
 
-  getConnection(userId: string): PeerConnection | undefined {
-    return this.connections.get(userId);
+  handleSignal(userId: string, signal: SimplePeer.SignalData) {
+    const connection = this.connections.get(userId);
+    if (connection) {
+      connection.peer.signal(signal);
+    }
   }
 
-  async handleSignal(userId: string, signal: SimplePeer.SignalData) {
-    try {
-      let connection = this.connections.get(userId);
-      
-      // If receiving an offer and no connection exists, create one
-      if (!connection && signal.type === 'offer') {
-        console.log('Creating new peer as receiver');
-        await this.initializePeer(userId, false);
-        connection = this.connections.get(userId);
-      }
-
-      if (!connection) {
-        console.log('No connection found for peer:', userId);
-        return;
-      }
-
-      const pc = (connection.peer as any).pc;
-      if (pc) {
-        console.log('Current signaling state:', pc.signalingState);
-        console.log('Connection state:', pc.connectionState);
-        console.log('ICE connection state:', pc.iceConnectionState);
-        console.log('Received signal type:', signal.type);
-
-        // Handle different signaling states
-        if (signal.type === 'offer') {
-          if (pc.signalingState !== 'stable') {
-            console.log('Rolling back pending operations...');
-            await pc.setLocalDescription({ type: 'rollback' });
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        } else if (signal.type === 'answer') {
-          if (pc.signalingState !== 'have-local-offer') {
-            console.log('Invalid state for answer, waiting...');
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
-      }
-
-      connection.peer.signal(signal);
-    } catch (error) {
-      console.error('Error handling signal:', error);
-      // Only recreate connection if it's a signaling error
-      if (error.message.includes('setRemoteDescription')) {
-        console.log('Signaling error, recreating connection...');
-        await this.initializePeer(userId, false);
-      }
-    }
+  getConnection(userId: string): PeerConnection | undefined {
+    return this.connections.get(userId);
   }
 
   closeConnection(userId: string) {

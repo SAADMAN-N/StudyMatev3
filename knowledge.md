@@ -180,6 +180,11 @@ For collaborative editing features:
             - Monitor connection state changes and retry on failure
             - Create new peer connection when receiving offer without existing connection
             - Handle connection failures by recreating the connection
+            - Use multiple STUN servers for better NAT traversal
+            - Monitor ICE gathering state and candidates
+            - Implement ICE restart on connection failure
+            - Add delay before retrying failed connections
+            - Use all available ICE transport policies
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable
