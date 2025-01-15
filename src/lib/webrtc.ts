@@ -45,25 +45,27 @@ export class WebRTCManagerImpl implements WebRTCManager {
     this.onStreamCallback = callback;
   }
 
-  async initializePeer(userId: string, initiator: boolean): Promise<SimplePeer.Instance> {
+  async initializePeer(userId: string, initiator: boolean, retryCount = 0): Promise<SimplePeer.Instance> {
     // Always clean up existing connection first
     this.closeConnection(userId);
 
     try {
       const stream = await this.getLocalStream();
       
+      if (retryCount >= 3) {
+        throw new Error('Max retry attempts reached');
+      }
+
+      console.log(`Initializing peer (attempt ${retryCount + 1}/3):`, { userId, initiator });
+      
       const peer = new SimplePeer({
         initiator,
         stream,
-        trickle: true, // Enable trickle ICE for better connectivity
+        trickle: false, // Disable trickle ICE for simpler signaling
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
+            { urls: 'stun:stun1.l.google.com:19302' }
           ]
         }
       });
@@ -76,9 +78,14 @@ export class WebRTCManagerImpl implements WebRTCManager {
         }
       });
 
-      // Basic error handling
-      peer.on('error', (err) => {
+      peer.on('error', async (err) => {
         console.error('Peer error:', err);
+        if (err.message.includes('setLocalDescription') || err.message.includes('setRemoteDescription')) {
+          if (retryCount < 3) {
+            console.log('Retrying peer connection...');
+            await this.initializePeer(userId, initiator, retryCount + 1);
+          }
+        }
       });
 
       // Connection events
@@ -100,10 +107,46 @@ export class WebRTCManagerImpl implements WebRTCManager {
     }
   }
 
-  handleSignal(userId: string, signal: SimplePeer.SignalData) {
-    const connection = this.connections.get(userId);
-    if (connection) {
+  async handleSignal(userId: string, signal: SimplePeer.SignalData) {
+    try {
+      const connection = this.connections.get(userId);
+      if (!connection) {
+        // Only create new connection for offer signals
+        if (signal.type === 'offer') {
+          console.log('Creating new peer for offer');
+          await this.initializePeer(userId, false);
+          const newConnection = this.connections.get(userId);
+          if (newConnection) {
+            newConnection.peer.signal(signal);
+          }
+        }
+        return;
+      }
+
+      // Get the RTCPeerConnection instance
+      const pc = (connection.peer as any).pc;
+      if (pc) {
+        const signalingState = pc.signalingState;
+        console.log('Current signaling state:', signalingState);
+
+        // Handle different signal types based on current state
+        if (signal.type === 'offer') {
+          if (signalingState !== 'stable') {
+            console.log('Handling offer in non-stable state');
+            await pc.setLocalDescription({type: 'rollback'});
+          }
+        } else if (signal.type === 'answer') {
+          if (signalingState !== 'have-local-offer') {
+            console.log('Ignoring answer in wrong state:', signalingState);
+            return;
+          }
+        }
+      }
+
+      // Apply the signal
       connection.peer.signal(signal);
+    } catch (error) {
+      console.error('Error handling signal:', error);
     }
   }
 
