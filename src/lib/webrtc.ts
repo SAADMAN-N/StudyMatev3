@@ -44,10 +44,32 @@ export class WebRTCManager {
         trickle: false,
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' }
           ]
+        },
+        sdpTransform: (sdp) => {
+          // Log the SDP for debugging
+          console.log('SDP:', sdp);
+          return sdp;
         }
       }) as SimplePeer.Instance;
+
+      // Monitor connection state changes
+      const pc = (peer as any).pc;
+      if (pc) {
+        pc.onconnectionstatechange = () => {
+          console.log('Connection state:', pc.connectionState);
+        };
+        pc.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', pc.iceConnectionState);
+        };
+        pc.onsignalingstatechange = () => {
+          console.log('Signaling state:', pc.signalingState);
+        };
+      }
 
       peer.on('stream', (remoteStream: MediaStream) => {
         if (this.onStreamCallback) {
@@ -55,7 +77,14 @@ export class WebRTCManager {
         }
       });
 
-      peer.on('error', (err) => console.error('Peer error:', err));
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        // Try to recover from errors by recreating the connection
+        if (err.message.includes('setRemoteDescription')) {
+          console.log('Attempting to recover from setRemoteDescription error...');
+          this.closeConnection(userId);
+        }
+      });
       peer.on('connect', () => console.log('Peer connected'));
       peer.on('close', () => console.log('Peer closed'));
 
@@ -85,9 +114,28 @@ export class WebRTCManager {
         return;
       }
 
+      // Check signaling state before applying signal
+      const pc = (connection.peer as any).pc;
+      if (pc) {
+        console.log('Current signaling state:', pc.signalingState);
+        
+        // Wait for signaling state to stabilize if needed
+        if (signal.type === 'answer' && pc.signalingState !== 'have-local-offer') {
+          console.log('Invalid state for answer, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (signal.type === 'offer' && pc.signalingState !== 'stable') {
+          console.log('Invalid state for offer, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
       connection.peer.signal(signal);
     } catch (error) {
       console.error('Failed to handle signal:', error);
+      // Try to recover by creating a new connection
+      await this.initializePeer(userId, false);
     }
   }
 

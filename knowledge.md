@@ -168,6 +168,9 @@ For collaborative editing features:
           - Wait for signaling state to stabilize
           - Create new peer connection when receiving offer without existing connection
           - Access RTCPeerConnection through (peer as any).pc due to type limitations
+          - Check signaling state matches signal type (offer->stable, answer->have-local-offer)
+          - Monitor all connection states (connection, ICE, signaling) for debugging
+          - Use multiple STUN servers for better NAT traversal
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable
