@@ -243,16 +243,21 @@ const SharedEditor = () => {
 
   // Initialize WebSocket provider
   const provider = React.useMemo(() => {
-    try {      // Create the provider with a more reliable WebSocket server
+    try {      // Use our existing signaling server for WebSocket connection
+      const wsUrl = import.meta.env.VITE_SIGNALING_SERVER?.replace('http', 'ws') || 
+        (window.location.hostname === 'localhost' ? 'ws://localhost:3001' : 'wss://studymate-signaling.onrender.com');
+      
+      console.log('Connecting to WebSocket server:', wsUrl);
+      
       const provider = new WebsocketProvider(
-        'wss://y-websocket-eu.fly.dev',
-        'studymate-shared-note-' + Math.floor(Math.random() * 1000), // Unique room name with smaller number
+        wsUrl,
+        'studymate-shared-note-' + Math.floor(Math.random() * 1000), // Unique room name
         ydoc,
         { 
           connect: true,
-          maxBackoffTime: 2500, // Reduce max reconnection delay
-          WebSocketPolyfill: WebSocket, // Explicitly set WebSocket implementation
-          resyncInterval: 3000 // Resync every 3 seconds if needed
+          maxBackoffTime: 2500, // Reduce reconnection delay
+          WebSocketPolyfill: WebSocket,
+          resyncInterval: 3000
         }
       );
 

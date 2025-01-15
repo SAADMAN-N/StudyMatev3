@@ -110,10 +110,12 @@ For collaborative editing features:
   - Monitor WebSocket connection state
   - Explicitly set WebSocketPolyfill to avoid polyfill issues
   - Use resyncInterval for better consistency
-  - If one WebSocket server fails, try these in order:
-    1. wss://y-websocket-eu.fly.dev
-    2. wss://ws.yjs.dev
-    3. wss://y-webrtc-signaling-us.herokuapp.com
+  - If public WebSocket servers are unreliable, use your own signaling server:
+    1. Reuse existing signaling server for WebSocket connections
+    2. Convert HTTP URL to WS/WSS (http->ws, https->wss)
+    3. Ensure server supports WebSocket upgrade
+    4. Keep room names short and simple
+    5. Monitor WebSocket connection state
 - When using Yjs with TipTap:
   - Disable history plugin as it's handled by Yjs
   - Set initial content through editor configuration, not collaboration options
