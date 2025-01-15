@@ -59,100 +59,36 @@ export class WebRTCManager {
   }
 
   async initializePeer(userId: string, initiator: boolean = false): Promise<SimplePeer.Instance> {
-    try {
-      // Close any existing connection
-      const existingConnection = this.connections.get(userId);
-      if (existingConnection) {
-        existingConnection.peer.destroy();
-        this.connections.delete(userId);
-      }
+    // Always clean up existing connection first
+    this.closeConnection(userId);
 
+    try {
       const stream = await this.getLocalStream();
-      
       console.log('Creating peer with stream:', stream.id, 'as initiator:', initiator);
       
-      // Create SimplePeer instance directly without using call
       const peer = new SimplePeer({
         initiator,
         stream,
-        trickle: false,
-        sdpTransform: (sdp) => {
-          // Ensure proper SDP negotiation
-          console.log('Transforming SDP:', sdp);
-          return sdp;
-        },
+        trickle: false, // Disable trickle ICE for simpler signaling
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
+            { urls: 'stun:stun.l.google.com:19302' }, // Use just one STUN server for simplicity
           ]
         }
       }) as SimplePeer.Instance;
 
+      // Simplified event handlers
       peer.on('stream', (remoteStream: MediaStream) => {
-        console.log('Received remote stream from peer:', remoteStream.id);
-        console.log('Stream tracks:', remoteStream.getTracks().map(t => ({
-          kind: t.kind,
-          enabled: t.enabled,
-          muted: t.muted,
-          readyState: t.readyState
-        })));
-        
-        const attemptCallback = (retries = 3) => {
-          if (this.onStreamCallback) {
-            console.log('Calling stream callback with remote stream');
-            try {
-              this.onStreamCallback(remoteStream);
-            } catch (error) {
-              console.error('Error in stream callback:', error);
-              if (retries > 0) {
-                console.log(`Retrying callback in 1s, ${retries} attempts remaining`);
-                setTimeout(() => attemptCallback(retries - 1), 1000);
-              }
-            }
-          } else {
-            console.warn('No stream callback registered');
-          }
-        };
-        
-        attemptCallback();
+        console.log('Received remote stream');
+        if (this.onStreamCallback) {
+          this.onStreamCallback(remoteStream);
+        }
       });
 
-      peer.on('error', (err) => {
-        console.error('Peer connection error:', err);
-        console.error('Error details:', {
-          message: err.message,
-          stack: err.stack
-        });
-      });
-
-      peer.on('connect', () => {
-        console.log('Peer connection established with stream:', stream.id);
-        console.log('Stream tracks:', stream.getTracks().map(t => ({
-          kind: t.kind,
-          enabled: t.enabled,
-          muted: t.muted,
-          readyState: t.readyState
-        })));
-        console.log('Stream tracks:', stream.getTracks().map(t => ({
-          kind: t.kind,
-          enabled: t.enabled,
-          muted: t.muted,
-          readyState: t.readyState
-        })));
-      });
-
-      peer.on('close', () => {
-        console.log('Peer connection closed');
-      });
-
-      peer.on('signal', (data) => {
-        console.log('Generated signal data:', data.type);
-      });
+      peer.on('error', (err) => console.error('Peer error:', err));
+      peer.on('connect', () => console.log('Peer connected'));
+      peer.on('close', () => console.log('Peer closed'));
+      peer.on('signal', (data) => console.log('Signal:', data.type));
 
       this.connections.set(userId, { peer, stream });
       return peer;
@@ -170,44 +106,21 @@ export class WebRTCManager {
     try {
       let connection = this.connections.get(userId);
       
-      // If we don't have a connection and receiving an offer, create one as non-initiator
+      // If receiving an offer and no connection exists, create one
       if (!connection && signal.type === 'offer') {
-        console.log('Creating new peer as receiver for:', userId);
-        const peer = await this.initializePeer(userId, false);
+        await this.initializePeer(userId, false);
         connection = this.connections.get(userId);
       }
 
-      if (connection) {
-        console.log('Handling signal for peer:', userId, 'signal type:', signal.type);
-        
-        // Wait for any pending operations to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Check peer connection state before applying signal
-        if (connection.peer.destroyed) {
-          console.log('Peer destroyed, creating new connection');
-          await this.initializePeer(userId, false);
-          return;
-        }
-
-        // Handle signal based on type
-        if (signal.type === 'offer' || signal.type === 'answer') {
-          // Ensure we're in the right state before applying the signal
-          const pc = (connection.peer as any).pc;
-          if (pc && pc.signalingState !== 'stable') {
-            console.log('Waiting for signaling state to stabilize...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
-
-        connection.peer.signal(signal);
-      } else {
+      if (!connection) {
         console.error('No peer connection found for:', userId);
+        return;
       }
+
+      // Simple signal handling without complex state management
+      connection.peer.signal(signal);
     } catch (error) {
       console.error('Failed to handle signal:', error);
-      // Try to recover by creating a new connection
-      await this.initializePeer(userId, false);
     }
   }
 

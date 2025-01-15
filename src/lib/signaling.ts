@@ -30,100 +30,53 @@ export class SignalingService {
   }
 
   private setupSocketListeners() {
-    this.socket.on('connect', () => {
-      console.log('Connected to signaling server with ID:', this.socket.id);
-      toast({
-        title: "Connected",
-        description: "Successfully connected to signaling server",
-        variant: "default",
-      });
-    });
+    // Basic connection events
+    this.socket.on('connect', () => console.log('Connected to signaling server'));
+    this.socket.on('disconnect', () => console.log('Disconnected from signaling server'));
+    this.socket.on('connect_error', (error) => console.error('Connection error:', error));
 
-    this.socket.on('connect_error', (error) => {
-      console.error('Failed to connect to signaling server:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to signaling server. Please check your internet connection.",
-        variant: "destructive",
-        duration: 5000,
-      });
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from signaling server');
-      toast({
-        title: "Disconnected",
-        description: "Lost connection to signaling server",
-        variant: "destructive",
-        duration: 5000,
-      });
-    });
-
+    // Handle peer matching
     this.socket.on('matched', async (peerId: string) => {
-      console.log('Matched with peer:', peerId);
-      console.log('Local socket ID:', this.socket.id);
       try {
-        // Initialize peer with correct initiator flag
         const peer = await this.webrtcManager.initializePeer(peerId, true);
-        
         peer.on('signal', (signal) => {
-          console.log('Sending signal to peer:', peerId, 'signal type:', signal.type);
           this.socket.emit('signal', { peerId, signal });
         });
-
-        peer.on('error', (err) => {
-          console.error('WebRTC peer error:', err);
-        });
-
         peer.on('connect', () => {
-          console.log('Direct peer connection established with:', peerId);
-          this.onPeerConnectedCallback?.();
+          if (this.onPeerConnectedCallback) {
+            this.onPeerConnectedCallback();
+          }
         });
-
       } catch (error) {
         console.error('Failed to initialize peer:', error);
       }
     });
 
+    // Handle signaling
     this.socket.on('signal', async ({ peerId, signal }) => {
-      console.log('Received signal from peer:', peerId, 'signal type:', signal.type);
       try {
-        // If we don't have a peer instance yet, create one as non-initiator
         let connection = this.webrtcManager.getConnection(peerId);
         if (!connection) {
-          console.log('Creating new peer as receiver for:', peerId);
           const peer = await this.webrtcManager.initializePeer(peerId, false);
-          
           peer.on('signal', (signal) => {
-            console.log('Sending signal back to peer:', peerId, 'signal type:', signal.type);
             this.socket.emit('signal', { peerId, signal });
           });
-
           peer.on('connect', () => {
-            console.log('Direct peer connection established with:', peerId);
-            this.onPeerConnectedCallback?.();
+            if (this.onPeerConnectedCallback) {
+              this.onPeerConnectedCallback();
+            }
           });
         }
-        
         await this.webrtcManager.handleSignal(peerId, signal);
       } catch (error) {
         console.error('Failed to handle signal:', error);
       }
     });
 
+    // Handle peer disconnection
     this.socket.on('peer-left', (peerId: string) => {
-      console.log('Peer left:', peerId);
       this.webrtcManager.closeConnection(peerId);
       this.onPeerDisconnectedCallback?.();
-    });
-
-    this.socket.on('reconnect', (attemptNumber: number) => {
-      console.log('Reconnected to signaling server after', attemptNumber, 'attempts');
-      toast({
-        title: "Reconnected",
-        description: "Connection to signaling server restored",
-        variant: "default",
-      });
     });
   }
 
