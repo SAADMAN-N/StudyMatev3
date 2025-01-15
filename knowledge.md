@@ -201,6 +201,9 @@ For collaborative editing features:
           - Set define['process.env'] = process.env
           - Create a custom polyfill file for process.nextTick instead of using Vite's define
           - Import polyfills before any other imports in main entry point
+          - Ensure polyfills are not tree-shaken by exporting and using a function
+          - Define process.nextTick as a regular function, not an arrow function
+          - Return the setTimeout call to match Node.js behavior
           - When using simple-peer with Vite:
             - Need to polyfill global with globalThis in vite.config.ts
             - Create SimplePeer instance directly without using call
