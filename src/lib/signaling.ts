@@ -195,8 +195,13 @@ export class SignalingService {
     this.socket.disconnect();
   }
 
-  public onPeerConnected(callback: () => void) {
-    this.onPeerConnectedCallback = callback;
+  public onPeerConnected(callback: (peerId: string) => void) {
+    this.onPeerConnectedCallback = () => {
+      const connections = Array.from(this.webrtcManager.connections.keys());
+      if (connections.length > 0) {
+        callback(connections[0]);
+      }
+    };
   }
 
   public onPeerDisconnected(callback: () => void) {

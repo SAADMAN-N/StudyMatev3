@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
@@ -67,6 +69,8 @@ interface VideoPanelProps {
   onToggleCamera?: () => void;
   onToggleMic?: () => void;
   onOpenSettings?: () => void;
+  messages?: Array<{ text: string; fromSelf: boolean }>;
+  onSendMessage?: (text: string) => void;
 }
 
 const VideoPanel = ({
@@ -92,6 +96,7 @@ const VideoPanel = ({
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isSearching, setIsSearching] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [activeConnection, setActiveConnection] = useState<string>('');
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const webrtcManager = useRef<WebRTCManager>(new WebRTCManager());
@@ -108,9 +113,10 @@ const VideoPanel = ({
         // Initialize signaling service after getting local stream
         signalingService.current = new SignalingService(webrtcManager.current);
         
-        signalingService.current.onPeerConnected(() => {
+        signalingService.current.onPeerConnected((peerId) => {
           setIsConnected(true);
           setIsSearching(false);
+          setActiveConnection(peerId);
         });
 
         signalingService.current.onPeerDisconnected(() => {
@@ -166,6 +172,9 @@ const VideoPanel = ({
   }, []);
 
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Array<{ text: string; fromSelf: boolean }>>([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get roomId from URL if it exists
   const [roomId, setRoomId] = useState<string>(() => {
@@ -358,14 +367,84 @@ const VideoPanel = ({
           </div>
         </div>
 
-        {/* Interests overlay */}
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-          {matchInfo.interests.map((interest) => (
-            <Badge key={interest} variant="secondary">
-              {interest}
-            </Badge>
-          ))}
-        </div>
+        {/* Interests overlay */}          {/* Chat area */}
+          <div className="absolute bottom-20 left-4 right-4 bg-slate-800/90 rounded-lg p-4 max-h-[300px] flex flex-col">
+            <ScrollArea className="flex-1 h-[200px]">
+              <div className="space-y-4">
+                {messages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.fromSelf ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                        msg.fromSelf ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-100'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
+            
+            <div className="flex gap-2 mt-4">
+              <Input
+                value={currentMessage}
+                onChange={(e) => setCurrentMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (currentMessage.trim()) {
+                      // Send message
+                      const connection = webrtcManager.current.getConnection(activeConnection);
+                      if (connection?.peer) {
+                        const messageData = {
+                          type: 'chat',
+                          text: currentMessage.trim()
+                        };
+                        connection.peer.send(JSON.stringify(messageData));
+                        // Add message to local state
+                        setMessages(prev => [...prev, { text: currentMessage.trim(), fromSelf: true }]);
+                        setCurrentMessage('');
+                      }
+                    }
+                  }
+                }}
+                placeholder="Type a message..."
+                className="flex-1"
+              />
+              <Button
+                onClick={() => {
+                  if (currentMessage.trim()) {
+                    // Send message
+                    const connection = webrtcManager.current.getConnection(activeConnection);
+                    if (connection?.peer) {
+                      const messageData = {
+                        type: 'chat',
+                        text: currentMessage.trim()
+                      };
+                      connection.peer.send(JSON.stringify(messageData));
+                      // Add message to local state
+                      setMessages(prev => [...prev, { text: currentMessage.trim(), fromSelf: true }]);
+                      setCurrentMessage('');
+                    }
+                  }
+                }}
+              >
+                Send
+              </Button>
+            </div>
+          </div>
+
+          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+            {matchInfo.interests.map((interest) => (
+              <Badge key={interest} variant="secondary">
+                {interest}
+              </Badge>
+            ))}
+          </div>
       </div>
 
       {/* Control bar */}

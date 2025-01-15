@@ -8,7 +8,7 @@ interface PeerConnection {
 type StreamCallback = (stream: MediaStream) => void;
 
 export class WebRTCManager {
-  private connections: Map<string, PeerConnection> = new Map();
+  public connections: Map<string, PeerConnection> = new Map();
   private localStream: MediaStream | null = null;
   private onStreamCallback?: StreamCallback;
 
