@@ -184,6 +184,7 @@ For collaborative editing features:
     - In vite.config.ts:
       - Set define.global = 'globalThis'
       - Set define['process.env'] = process.env
+      - Set define['process.nextTick'] = 'setImmediate'
       - Add all polyfills to resolve.alias
     - Required Node.js polyfills:
       - stream-browserify
