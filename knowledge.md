@@ -199,7 +199,24 @@ For collaborative editing features:
         - In vite.config.ts:
           - Set define.global = 'globalThis'
           - Set define['process.env'] = process.env
-          - Set define['process.nextTick'] = '"function(fn) { setTimeout(fn, 0); }"'
+          - Create a custom polyfill file for process.nextTick instead of using Vite's define
+          - Import polyfills before any other imports in main entry point
+          - When using simple-peer with Vite:
+            - Need to polyfill global with globalThis in vite.config.ts
+            - Create SimplePeer instance directly without using call
+            - Use type assertion for proper TypeScript support
+            - Required Node.js polyfills:
+              - stream-browserify
+              - events
+              - inherits
+              - readable-stream
+              - util (must be aliased as 'util' not 'util/')
+              - process (must be aliased as 'process/browser')
+            - In vite.config.ts:
+              - Set define.global = 'globalThis'
+              - Set define['process.env'] = process.env
+              - Set define['process.nextTick'] = 'function(fn) { setTimeout(fn, 0); }'
+              - Add all polyfills to resolve.alias
           - Add all polyfills to resolve.alias
       - Add all polyfills to resolve.alias
     - Required Node.js polyfills:
