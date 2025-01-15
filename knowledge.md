@@ -164,6 +164,10 @@ For collaborative editing features:
           - Check peer state before applying signals
           - Use sdpTransform to monitor SDP negotiation
           - Handle connection errors with retry logic
+          - Check signaling state before applying SDP
+          - Wait for signaling state to stabilize
+          - Create new peer connection when receiving offer without existing connection
+          - Access RTCPeerConnection through (peer as any).pc due to type limitations
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable

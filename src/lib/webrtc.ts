@@ -168,7 +168,15 @@ export class WebRTCManager {
 
   async handleSignal(userId: string, signal: SimplePeer.SignalData) {
     try {
-      const connection = this.connections.get(userId);
+      let connection = this.connections.get(userId);
+      
+      // If we don't have a connection and receiving an offer, create one as non-initiator
+      if (!connection && signal.type === 'offer') {
+        console.log('Creating new peer as receiver for:', userId);
+        const peer = await this.initializePeer(userId, false);
+        connection = this.connections.get(userId);
+      }
+
       if (connection) {
         console.log('Handling signal for peer:', userId, 'signal type:', signal.type);
         
@@ -177,9 +185,19 @@ export class WebRTCManager {
         
         // Check peer connection state before applying signal
         if (connection.peer.destroyed) {
-          console.log('Peer already destroyed, creating new connection');
+          console.log('Peer destroyed, creating new connection');
           await this.initializePeer(userId, false);
           return;
+        }
+
+        // Handle signal based on type
+        if (signal.type === 'offer' || signal.type === 'answer') {
+          // Ensure we're in the right state before applying the signal
+          const pc = (connection.peer as any).pc;
+          if (pc && pc.signalingState !== 'stable') {
+            console.log('Waiting for signaling state to stabilize...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         }
 
         connection.peer.signal(signal);
