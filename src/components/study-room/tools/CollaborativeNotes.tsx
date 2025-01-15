@@ -245,12 +245,14 @@ const SharedEditor = () => {
   const provider = React.useMemo(() => {
     try {      // Create the provider with a more reliable WebSocket server
       const provider = new WebsocketProvider(
-        'wss://y-webrtc-signaling-us.herokuapp.com',
+        'wss://y-websocket-eu.fly.dev',
         'studymate-shared-note-' + Math.floor(Math.random() * 1000), // Unique room name with smaller number
         ydoc,
         { 
           connect: true,
-          maxBackoffTime: 2500 // Reduce max reconnection delay
+          maxBackoffTime: 2500, // Reduce max reconnection delay
+          WebSocketPolyfill: WebSocket, // Explicitly set WebSocket implementation
+          resyncInterval: 3000 // Resync every 3 seconds if needed
         }
       );
 

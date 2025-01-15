@@ -100,7 +100,7 @@ src/
 
 ## Real-time Collaboration
 For collaborative editing features:
-- Use wss://y-webrtc-signaling-us.herokuapp.com for WebSocket connections (most reliable public Yjs WebSocket server)
+- Use wss://y-websocket-eu.fly.dev for WebSocket connections (most reliable public Yjs WebSocket server)
 - Each collaborative document should have a unique room name to prevent conflicts
 - Add awareness information to help with debugging collaboration issues
 - When using Yjs with WebSocket:
@@ -108,6 +108,12 @@ For collaborative editing features:
   - Handle connection errors with retries
   - Keep room names short and simple
   - Monitor WebSocket connection state
+  - Explicitly set WebSocketPolyfill to avoid polyfill issues
+  - Use resyncInterval for better consistency
+  - If one WebSocket server fails, try these in order:
+    1. wss://y-websocket-eu.fly.dev
+    2. wss://ws.yjs.dev
+    3. wss://y-webrtc-signaling-us.herokuapp.com
 - When using Yjs with TipTap:
   - Disable history plugin as it's handled by Yjs
   - Set initial content through editor configuration, not collaboration options
