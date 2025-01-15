@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { WebRTCManager, WebRTCManagerImpl } from "@/lib/webrtc";
+import { WebRTCManager } from "@/lib/webrtc";
 import { SignalingService } from "@/lib/signaling";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Card } from "@/components/ui/card";
@@ -34,7 +34,7 @@ export default function VideoPanel() {
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const webrtcManager = useRef<WebRTCManager>(new WebRTCManagerImpl());
+  const webrtcManager = useRef<WebRTCManager>(new WebRTCManager());
   const signalingService = useRef<SignalingService>();
 
   useEffect(() => {

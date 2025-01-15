@@ -16,9 +16,8 @@ export class SignalingService {
     
     this.socket = io(SIGNALING_SERVER, {
       transports: ['websocket'],
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 10000
     });
 
     this.setupSocketListeners();
@@ -31,16 +30,11 @@ export class SignalingService {
 
     this.socket.on('matched', async (peerId: string) => {
       try {
-        console.log('Matched with peer:', peerId);
         const peer = await this.webrtcManager.initializePeer(peerId, true);
-        
         peer.on('signal', (signal) => {
-          console.log('Sending signal to peer:', signal.type);
           this.socket.emit('signal', { peerId, signal });
         });
-
         peer.on('connect', () => {
-          console.log('Peer connection established');
           if (this.onPeerConnectedCallback) {
             this.onPeerConnectedCallback();
           }
@@ -51,31 +45,19 @@ export class SignalingService {
     });
 
     this.socket.on('signal', async ({ peerId, signal }) => {
-      // Ignore candidate signals if we don't have a connection yet
-      if (!this.webrtcManager.getConnection(peerId) && signal.type === undefined) {
-        return;
-      }
       try {
-        console.log('Received signal from peer:', signal.type);
         let connection = this.webrtcManager.getConnection(peerId);
-        
         if (!connection) {
-          console.log('Creating new peer connection');
           const peer = await this.webrtcManager.initializePeer(peerId, false);
-          
           peer.on('signal', (signal) => {
-            console.log('Sending signal back:', signal.type);
             this.socket.emit('signal', { peerId, signal });
           });
-
           peer.on('connect', () => {
-            console.log('Peer connection established');
             if (this.onPeerConnectedCallback) {
               this.onPeerConnectedCallback();
             }
           });
         }
-
         this.webrtcManager.handleSignal(peerId, signal);
       } catch (error) {
         console.error('Failed to handle signal:', error);
@@ -83,7 +65,6 @@ export class SignalingService {
     });
 
     this.socket.on('peer-left', (peerId: string) => {
-      console.log('Peer left:', peerId);
       this.webrtcManager.closeConnection(peerId);
       if (this.onPeerDisconnectedCallback) {
         this.onPeerDisconnectedCallback();
@@ -92,17 +73,14 @@ export class SignalingService {
   }
 
   public findMatch(tags: string[]) {
-    console.log('Looking for match with tags:', tags);
     this.socket.emit('find-match', { tags });
   }
 
   public skipPeer(tags: string[]) {
-    console.log('Skipping current peer');
     this.socket.emit('skip', { tags });
   }
 
   public disconnect() {
-    console.log('Disconnecting from signaling server');
     this.socket.disconnect();
   }
 
