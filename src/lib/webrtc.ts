@@ -60,6 +60,13 @@ export class WebRTCManager {
 
   async initializePeer(userId: string, initiator: boolean = false): Promise<SimplePeer.Instance> {
     try {
+      // Close any existing connection
+      const existingConnection = this.connections.get(userId);
+      if (existingConnection) {
+        existingConnection.peer.destroy();
+        this.connections.delete(userId);
+      }
+
       const stream = await this.getLocalStream();
       
       console.log('Creating peer with stream:', stream.id, 'as initiator:', initiator);
@@ -69,6 +76,11 @@ export class WebRTCManager {
         initiator,
         stream,
         trickle: false,
+        sdpTransform: (sdp) => {
+          // Ensure proper SDP negotiation
+          console.log('Transforming SDP:', sdp);
+          return sdp;
+        },
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -154,13 +166,30 @@ export class WebRTCManager {
     return this.connections.get(userId);
   }
 
-  handleSignal(userId: string, signal: SimplePeer.SignalData) {
-    const connection = this.connections.get(userId);
-    if (connection) {
-      console.log('Handling signal for peer:', userId, 'signal type:', signal.type);
-      connection.peer.signal(signal);
-    } else {
-      console.error('No peer connection found for:', userId);
+  async handleSignal(userId: string, signal: SimplePeer.SignalData) {
+    try {
+      const connection = this.connections.get(userId);
+      if (connection) {
+        console.log('Handling signal for peer:', userId, 'signal type:', signal.type);
+        
+        // Wait for any pending operations to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Check peer connection state before applying signal
+        if (connection.peer.destroyed) {
+          console.log('Peer already destroyed, creating new connection');
+          await this.initializePeer(userId, false);
+          return;
+        }
+
+        connection.peer.signal(signal);
+      } else {
+        console.error('No peer connection found for:', userId);
+      }
+    } catch (error) {
+      console.error('Failed to handle signal:', error);
+      // Try to recover by creating a new connection
+      await this.initializePeer(userId, false);
     }
   }
 

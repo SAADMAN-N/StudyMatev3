@@ -158,6 +158,12 @@ For collaborative editing features:
           - Catch play() promise rejection
           - Provide fallback play button for browsers blocking autoplay
           - Check track states when receiving stream
+        - When handling WebRTC connections:
+          - Close existing connections before creating new ones
+          - Add delay between signal operations
+          - Check peer state before applying signals
+          - Use sdpTransform to monitor SDP negotiation
+          - Handle connection errors with retry logic
     - Check browser console for connection logs
     - Ensure both peers have camera/microphone permissions
     - Verify STUN/TURN servers are reachable
