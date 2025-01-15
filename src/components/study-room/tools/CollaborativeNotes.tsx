@@ -244,24 +244,24 @@ const SharedEditor = () => {
   // Initialize WebSocket provider
   const provider = React.useMemo(() => {
     try {
-      // Create the provider without awareness in the options
+      // Create the provider with a more reliable WebSocket server
       const provider = new WebsocketProvider(
-        'wss://y-websocket.fly.dev',
-        'studymate-shared-note-' + Math.random(), // Unique room name
-        ydoc
+        'wss://ws.yjs.dev',
+        'studymate-shared-note-' + Math.floor(Math.random() * 1000), // Unique room name with smaller number
+        ydoc,        { 
+          connect: true
+        }
       );
 
       // Set the awareness state after provider creation
       provider.awareness.setLocalState({
-        clientID: Math.random().toString(36).substr(2, 9),
-        name: user.name,
-        color: user.color,
         user: {
           name: user.name,
           color: user.color,
         }
       });
 
+      // Add more detailed status handling
       provider.on('status', ({ status: newStatus }: { status: string }) => {
         console.log('WebSocket status:', newStatus);
         setStatus(newStatus);
@@ -271,6 +271,16 @@ const SharedEditor = () => {
             description: "You can now collaborate with others in real-time",
             duration: 3000,
           });
+        } else if (newStatus === 'disconnected') {
+          toast({
+            title: "Disconnected",
+            description: "Trying to reconnect...",
+            variant: "destructive",
+          });
+          // Try to reconnect
+          setTimeout(() => {
+            provider.connect();
+          }, 1000);
         }
       });
 
@@ -281,15 +291,29 @@ const SharedEditor = () => {
         }
       });
 
-      provider.on('connection-error', (_event: Event, _provider: WebsocketProvider) => {
-        console.error('Connection error occurred');
+      provider.on('connection-error', (event: Event) => {
+        console.error('Connection error occurred:', event);
         setStatus('connection-error');
         toast({
           title: "Connection error",
-          description: "Failed to connect to collaboration server",
+          description: "Failed to connect to collaboration server. Retrying...",
           variant: "destructive",
           duration: 3000,
         });
+        // Try to reconnect after error
+        setTimeout(() => {
+          provider.connect();
+        }, 3000);
+      });
+
+      // Add connection close handler
+      provider.on('connection-close', () => {
+        console.log('Connection closed');
+        setStatus('disconnected');
+        // Try to reconnect
+        setTimeout(() => {
+          provider.connect();
+        }, 1000);
       });
 
       return provider;
@@ -309,13 +333,14 @@ const SharedEditor = () => {
     };
   }, [provider]);
 
-  const editor = useEditor(
-    {
+  const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        history: false // Disable history as it's handled by Yjs
+      }),
       Collaboration.configure({
         document: ydoc,
-        field: 'content',
+        field: 'content'
       }),
       ...(provider ? [
         CollaborationCursor.configure({
@@ -329,10 +354,9 @@ const SharedEditor = () => {
     ],
     editorProps: {
       attributes: {
-        class: 'prose-sm focus:outline-none w-full max-w-none',
+        class: 'prose prose-invert prose-sm w-full max-w-none focus:outline-none min-h-[200px] p-4',
       },
     },
-    content: '<p>Start typing here...</p>',
   });
 
   if (!editor) {

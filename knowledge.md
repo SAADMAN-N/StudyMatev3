@@ -100,8 +100,17 @@ src/
 
 ## Real-time Collaboration
 For collaborative editing features:
-- Use wss://y-websocket.fly.dev instead of wss://demos.yjs.dev for more reliable WebSocket connections
+- Use wss://ws.yjs.dev for WebSocket connections (most reliable public Yjs WebSocket server)
 - Each collaborative document should have a unique room name to prevent conflicts
+- Add awareness information to help with debugging collaboration issues
+- When using Yjs with TipTap:
+  - Disable history plugin as it's handled by Yjs
+  - Set initial content through editor configuration, not collaboration options
+  - Add reconnection logic for WebSocket disconnects
+  - Handle connection-close events separately from status events
+  - Keep awareness data minimal to avoid type errors
+  - Set awareness state after provider creation, not in provider options
+  - Only use the 'user' field in awareness state to avoid type errors
 
 ## State Management
 - React Context for theme
