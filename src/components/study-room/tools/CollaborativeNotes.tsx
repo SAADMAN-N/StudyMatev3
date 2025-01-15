@@ -245,7 +245,7 @@ const SharedEditor = () => {
   const provider = React.useMemo(() => {
     try {      // Use our existing signaling server for WebSocket connection
       const wsUrl = import.meta.env.VITE_SIGNALING_SERVER?.replace('http', 'ws') || 
-        (window.location.hostname === 'localhost' ? 'ws://localhost:3001' : 'wss://studymate-signaling.onrender.com');
+        (window.location.hostname === 'localhost' ? 'ws://localhost:3002' : 'wss://studymate-signaling.onrender.com');
       
       console.log('Connecting to WebSocket server:', wsUrl);
       
